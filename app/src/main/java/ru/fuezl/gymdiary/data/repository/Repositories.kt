@@ -1,0 +1,392 @@
+package ru.fuezl.gymdiary.data.repository
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import androidx.room.withTransaction
+import ru.fuezl.gymdiary.core.database.BodyWeightDao
+import ru.fuezl.gymdiary.core.database.BodyWeightEntryEntity
+import ru.fuezl.gymdiary.core.database.ExerciseDao
+import ru.fuezl.gymdiary.core.database.ExerciseEntity
+import ru.fuezl.gymdiary.core.database.GymDiaryDatabase
+import ru.fuezl.gymdiary.core.database.SeedData
+import ru.fuezl.gymdiary.core.database.WorkoutDao
+import ru.fuezl.gymdiary.core.database.WorkoutExerciseEntity
+import ru.fuezl.gymdiary.core.database.WorkoutSetEntity
+import ru.fuezl.gymdiary.core.database.WorkoutTemplateDao
+import ru.fuezl.gymdiary.core.database.WorkoutTemplateEntity
+import ru.fuezl.gymdiary.core.database.WorkoutTemplateExerciseEntity
+import ru.fuezl.gymdiary.core.database.asDetails
+import ru.fuezl.gymdiary.core.database.asModel
+import ru.fuezl.gymdiary.core.datastore.SettingsLocalDataSource
+import ru.fuezl.gymdiary.core.model.Equipment
+import ru.fuezl.gymdiary.core.model.Exercise
+import ru.fuezl.gymdiary.core.model.ExerciseProgressPoint
+import ru.fuezl.gymdiary.core.model.MuscleGroup
+import ru.fuezl.gymdiary.core.model.PersonalRecord
+import ru.fuezl.gymdiary.core.model.ThemeMode
+import ru.fuezl.gymdiary.core.model.UserSettings
+import ru.fuezl.gymdiary.core.model.WeeklyStats
+import ru.fuezl.gymdiary.core.model.WorkoutDetails
+import ru.fuezl.gymdiary.core.model.WorkoutSetModel
+import ru.fuezl.gymdiary.core.model.WorkoutSummary
+import ru.fuezl.gymdiary.core.database.WorkoutSessionEntity
+import ru.fuezl.gymdiary.domain.usecase.TrainingCalculators
+import java.time.LocalDate
+import java.time.ZoneId
+import javax.inject.Inject
+import javax.inject.Singleton
+
+interface ExerciseRepository {
+    fun observeExercises(): Flow<List<Exercise>>
+    fun searchExercises(query: String, muscleGroup: MuscleGroup?, equipment: Equipment?): Flow<List<Exercise>>
+    suspend fun getExercise(id: Long): Exercise?
+    suspend fun createExercise(name: String, muscleGroup: MuscleGroup, equipment: Equipment, note: String): Long
+    suspend fun updateExercise(exercise: Exercise)
+    suspend fun deleteExercise(id: Long)
+    suspend fun seedDefaultsIfEmpty()
+}
+
+@Singleton
+class DefaultExerciseRepository @Inject constructor(
+    private val dao: ExerciseDao,
+) : ExerciseRepository {
+    override fun observeExercises(): Flow<List<Exercise>> = dao.observeExercises().map { it.map(ExerciseEntity::asModel) }
+
+    override fun searchExercises(query: String, muscleGroup: MuscleGroup?, equipment: Equipment?): Flow<List<Exercise>> =
+        dao.searchExercises(query.trim(), muscleGroup?.name, equipment?.name).map { it.map(ExerciseEntity::asModel) }
+
+    override suspend fun getExercise(id: Long): Exercise? = dao.getExercise(id)?.asModel()
+
+    override suspend fun createExercise(name: String, muscleGroup: MuscleGroup, equipment: Equipment, note: String): Long {
+        val now = System.currentTimeMillis()
+        return dao.insert(ExerciseEntity(name = name.trim(), muscleGroup = muscleGroup, equipment = equipment, note = note.trim(), isCustom = true, createdAt = now, updatedAt = now))
+    }
+
+    override suspend fun updateExercise(exercise: Exercise) {
+        dao.update(
+            ExerciseEntity(
+                id = exercise.id,
+                name = exercise.name.trim(),
+                muscleGroup = exercise.muscleGroup,
+                equipment = exercise.equipment,
+                note = exercise.note.trim(),
+                isCustom = exercise.isCustom,
+                createdAt = exercise.createdAt,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    override suspend fun deleteExercise(id: Long) {
+        dao.getExercise(id)?.takeIf { it.isCustom }?.let { dao.delete(it) }
+    }
+
+    override suspend fun seedDefaultsIfEmpty() {
+        if (dao.count() == 0) dao.insertAll(SeedData.exercises())
+    }
+}
+
+interface WorkoutRepository {
+    fun observeActiveWorkout(): Flow<WorkoutDetails?>
+    fun observeWorkoutHistory(): Flow<List<WorkoutSummary>>
+    fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?>
+    suspend fun startWorkout(title: String = "Тренировка"): Long
+    suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long): Long
+    suspend fun addSet(workoutExerciseId: Long): Long
+    suspend fun updateSet(set: WorkoutSetModel)
+    suspend fun completeSet(setId: Long, completed: Boolean)
+    suspend fun deleteSet(setId: Long)
+    suspend fun finishWorkout(workoutId: Long)
+    suspend fun deleteWorkout(workoutId: Long)
+    suspend fun repeatWorkout(workoutId: Long): Long
+}
+
+@Singleton
+class DefaultWorkoutRepository @Inject constructor(
+    private val dao: WorkoutDao,
+    private val templateDao: WorkoutTemplateDao,
+) : WorkoutRepository {
+    override fun observeActiveWorkout(): Flow<WorkoutDetails?> =
+        dao.observeActiveWorkout().map { session -> session?.let { dao.getWorkoutDetails(it.id)?.asDetails() } }
+
+    override fun observeWorkoutHistory(): Flow<List<WorkoutSummary>> =
+        dao.observeFinishedWorkoutDetails().map { workouts -> workouts.map { it.asDetails().summary }.sortedByDescending { it.startedAt } }
+
+    override fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?> = dao.observeWorkoutDetails(id).map { it?.asDetails() }
+
+    override suspend fun startWorkout(title: String): Long {
+        val now = System.currentTimeMillis()
+        return dao.insertSession(WorkoutSessionEntity(title = title, startedAt = now, createdAt = now, updatedAt = now))
+    }
+
+    override suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long): Long {
+        val order = dao.getWorkoutExercises(workoutId).size
+        return dao.insertWorkoutExercise(WorkoutExerciseEntity(workoutSessionId = workoutId, exerciseId = exerciseId, orderIndex = order))
+    }
+
+    override suspend fun addSet(workoutExerciseId: Long): Long {
+        val next = dao.getSets(workoutExerciseId).size + 1
+        return dao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = next, weightKg = 0.0, reps = 0))
+    }
+
+    override suspend fun updateSet(set: WorkoutSetModel) {
+        dao.updateSet(
+            WorkoutSetEntity(
+                id = set.id,
+                workoutExerciseId = set.workoutExerciseId,
+                setNumber = set.setNumber,
+                weightKg = set.weightKg,
+                reps = set.reps,
+                rpe = set.rpe,
+                isCompleted = set.isCompleted,
+                note = set.note,
+                createdAt = set.createdAt,
+            ),
+        )
+    }
+
+    override suspend fun completeSet(setId: Long, completed: Boolean) {
+        dao.getSet(setId)?.let { dao.updateSet(it.copy(isCompleted = completed)) }
+    }
+
+    override suspend fun deleteSet(setId: Long) = dao.deleteSet(setId)
+
+    override suspend fun finishWorkout(workoutId: Long) {
+        val session = dao.getSession(workoutId) ?: return
+        val now = System.currentTimeMillis()
+        dao.updateSession(session.copy(finishedAt = now, durationSeconds = ((now - session.startedAt) / 1000).coerceAtLeast(0), updatedAt = now))
+    }
+
+    override suspend fun deleteWorkout(workoutId: Long) = dao.deleteSession(workoutId)
+
+    override suspend fun repeatWorkout(workoutId: Long): Long {
+        val details = dao.getWorkoutDetails(workoutId)?.asDetails() ?: return startWorkout()
+        val newId = startWorkout(details.summary.title)
+        details.exercises.forEach { exercise ->
+            val workoutExerciseId = addExerciseToWorkout(newId, exercise.exerciseId)
+            exercise.sets.forEach { old ->
+                val setId = addSet(workoutExerciseId)
+                dao.getSet(setId)?.let { dao.updateSet(it.copy(weightKg = old.weightKg, reps = old.reps, rpe = old.rpe, note = old.note, isCompleted = false)) }
+            }
+        }
+        return newId
+    }
+}
+
+data class WorkoutTemplateSummary(
+    val id: Long,
+    val title: String,
+    val note: String,
+    val exerciseCount: Int,
+)
+
+interface WorkoutTemplateRepository {
+    fun observeTemplates(): Flow<List<WorkoutTemplateSummary>>
+    suspend fun createTemplateFromWorkout(workoutId: Long, title: String, note: String = ""): Long
+    suspend fun startWorkoutFromTemplate(templateId: Long): Long
+    suspend fun deleteTemplate(templateId: Long)
+}
+
+@Singleton
+class DefaultWorkoutTemplateRepository @Inject constructor(
+    private val workoutDao: WorkoutDao,
+    private val templateDao: WorkoutTemplateDao,
+) : WorkoutTemplateRepository {
+    override fun observeTemplates(): Flow<List<WorkoutTemplateSummary>> =
+        templateDao.observeTemplates().map { templates ->
+            templates.map { template ->
+                WorkoutTemplateSummary(
+                    id = template.id,
+                    title = template.title,
+                    note = template.note,
+                    exerciseCount = templateDao.getTemplateExercises(template.id).size,
+                )
+            }
+        }
+
+    override suspend fun createTemplateFromWorkout(workoutId: Long, title: String, note: String): Long {
+        val workoutExercises = workoutDao.getWorkoutExercises(workoutId)
+        val now = System.currentTimeMillis()
+        val templateId = templateDao.insertTemplate(WorkoutTemplateEntity(title = title.trim(), note = note.trim(), createdAt = now, updatedAt = now))
+        workoutExercises.forEachIndexed { index, workoutExercise ->
+            templateDao.insertTemplateExercise(
+                WorkoutTemplateExerciseEntity(
+                    templateId = templateId,
+                    exerciseId = workoutExercise.exerciseId,
+                    orderIndex = index,
+                ),
+            )
+        }
+        return templateId
+    }
+
+    override suspend fun startWorkoutFromTemplate(templateId: Long): Long {
+        val template = templateDao.getTemplate(templateId) ?: return 0L
+        val now = System.currentTimeMillis()
+        val workoutId = workoutDao.insertSession(WorkoutSessionEntity(title = template.title, startedAt = now, createdAt = now, updatedAt = now))
+        templateDao.getTemplateExercises(templateId).forEach { templateExercise ->
+            workoutDao.insertWorkoutExercise(
+                WorkoutExerciseEntity(
+                    workoutSessionId = workoutId,
+                    exerciseId = templateExercise.exerciseId,
+                    orderIndex = templateExercise.orderIndex,
+                ),
+            )
+        }
+        return workoutId
+    }
+
+    override suspend fun deleteTemplate(templateId: Long) {
+        templateDao.deleteTemplate(templateId)
+    }
+}
+
+interface ProgressRepository {
+    fun observeWeeklyStats(): Flow<WeeklyStats>
+    fun observePersonalRecords(): Flow<List<PersonalRecord>>
+    fun observeExerciseProgress(exerciseId: Long): Flow<List<ExerciseProgressPoint>>
+    fun observeLastWeights(): Flow<List<Pair<String, Double>>>
+    fun observeBodyWeight(): Flow<List<BodyWeightEntryEntity>>
+    suspend fun addBodyWeight(weightKg: Double, note: String)
+    suspend fun deleteBodyWeight(id: Long)
+}
+
+@Singleton
+class DefaultProgressRepository @Inject constructor(
+    private val workoutDao: WorkoutDao,
+    private val bodyWeightDao: BodyWeightDao,
+) : ProgressRepository {
+    override fun observeWeeklyStats(): Flow<WeeklyStats> =
+        workoutDao.observeFinishedWorkoutDetails().map { workouts ->
+            val start = LocalDate.now().minusDays(6).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val details = workouts.map { it.asDetails() }.filter { it.summary.startedAt >= start }
+            WeeklyStats(details.size, details.sumOf { it.summary.setCount }, details.sumOf { it.summary.totalVolume })
+        }
+
+    override fun observePersonalRecords(): Flow<List<PersonalRecord>> =
+        workoutDao.observeFinishedWorkoutDetails().map { workouts ->
+            workouts.flatMap { it.asDetails().exercises }.groupBy { it.exerciseId }.mapNotNull { (_, entries) ->
+                val name = entries.firstOrNull()?.exerciseName ?: return@mapNotNull null
+                val sets = entries.flatMap { it.sets }.filter { it.isCompleted && it.reps > 0 }
+                if (sets.isEmpty()) return@mapNotNull null
+                PersonalRecord(
+                    exerciseId = entries.first().exerciseId,
+                    exerciseName = name,
+                    maxWeight = sets.maxOf { it.weightKg },
+                    bestRepsAtWeight = sets.maxWith(compareBy<WorkoutSetModel> { it.weightKg }.thenBy { it.reps }).reps,
+                    bestWorkoutVolume = entries.maxOf { TrainingCalculators.weightedVolume(it.sets) },
+                    bestEstimatedOneRm = sets.mapNotNull { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) }.maxOrNull() ?: 0.0,
+                )
+            }.sortedBy { it.exerciseName }
+        }
+
+    override fun observeExerciseProgress(exerciseId: Long): Flow<List<ExerciseProgressPoint>> =
+        workoutDao.observeFinishedWorkoutDetails().map { workouts ->
+            workouts.mapNotNull { workout ->
+                val details = workout.asDetails()
+                val exerciseSets = details.exercises.filter { it.exerciseId == exerciseId }.flatMap { it.sets }.filter { it.isCompleted }
+                if (exerciseSets.isEmpty()) null else ExerciseProgressPoint(
+                    date = details.summary.startedAt,
+                    maxWeight = exerciseSets.maxOf { it.weightKg },
+                    volume = TrainingCalculators.weightedVolume(exerciseSets),
+                )
+            }.sortedBy { it.date }
+        }
+
+    override fun observeLastWeights(): Flow<List<Pair<String, Double>>> =
+        workoutDao.observeFinishedWorkoutDetails().map { workouts ->
+            workouts.flatMap { workout ->
+                workout.asDetails().exercises.mapNotNull { exercise ->
+                    exercise.sets.filter { it.isCompleted && it.weightKg > 0.0 }.maxByOrNull { it.createdAt }?.let { exercise.exerciseName to it.weightKg }
+                }
+            }.distinctBy { it.first }.take(5)
+        }
+
+    override fun observeBodyWeight(): Flow<List<BodyWeightEntryEntity>> = bodyWeightDao.observeEntries()
+
+    override suspend fun addBodyWeight(weightKg: Double, note: String) {
+        bodyWeightDao.insert(BodyWeightEntryEntity(date = System.currentTimeMillis(), weightKg = weightKg, note = note.trim()))
+    }
+
+    override suspend fun deleteBodyWeight(id: Long) {
+        bodyWeightDao.delete(id)
+    }
+}
+
+interface SettingsRepository {
+    fun observeSettings(): Flow<UserSettings>
+    suspend fun updateTheme(themeMode: ThemeMode)
+    suspend fun updateRestTimer(enabled: Boolean, seconds: Int)
+    suspend fun exportData(): String
+    suspend fun importData(json: String)
+    suspend fun clearAllData()
+}
+
+@Serializable
+data class ExportData(
+    val exercises: List<ExerciseEntity>,
+    val workoutSessions: List<WorkoutSessionEntity>,
+    val workoutExercises: List<WorkoutExerciseEntity>,
+    val workoutSets: List<WorkoutSetEntity>,
+    val templates: List<ru.fuezl.gymdiary.core.database.WorkoutTemplateEntity>,
+    val templateExercises: List<ru.fuezl.gymdiary.core.database.WorkoutTemplateExerciseEntity>,
+    val bodyWeightEntries: List<BodyWeightEntryEntity> = emptyList(),
+    val settings: UserSettings,
+)
+
+@Singleton
+class DefaultSettingsRepository @Inject constructor(
+    private val database: GymDiaryDatabase,
+    private val exerciseDao: ExerciseDao,
+    private val workoutDao: WorkoutDao,
+    private val templateDao: WorkoutTemplateDao,
+    private val bodyWeightDao: BodyWeightDao,
+    private val settingsDataStore: SettingsLocalDataSource,
+) : SettingsRepository {
+    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+
+    override fun observeSettings(): Flow<UserSettings> = settingsDataStore.settings
+
+    override suspend fun updateTheme(themeMode: ThemeMode) = settingsDataStore.updateTheme(themeMode)
+
+    override suspend fun updateRestTimer(enabled: Boolean, seconds: Int) = settingsDataStore.updateRestTimer(enabled, seconds)
+
+    override suspend fun exportData(): String = json.encodeToString(
+        ExportData(
+            exercises = exerciseDao.getAll(),
+            workoutSessions = workoutDao.getAllSessions(),
+            workoutExercises = workoutDao.getAllWorkoutExercises(),
+            workoutSets = workoutDao.getAllSets(),
+            templates = templateDao.getAllTemplates(),
+            templateExercises = templateDao.getAllTemplateExercises(),
+            bodyWeightEntries = bodyWeightDao.getAll(),
+            settings = settingsDataStore.settings.first(),
+        ),
+    )
+
+    override suspend fun importData(json: String) {
+        val data = this.json.decodeFromString<ExportData>(json)
+        database.clearAllTables()
+        database.withTransaction {
+            exerciseDao.upsertAll(data.exercises)
+            workoutDao.upsertSessions(data.workoutSessions)
+            workoutDao.upsertWorkoutExercises(data.workoutExercises)
+            workoutDao.upsertSets(data.workoutSets)
+            templateDao.upsertTemplates(data.templates)
+            templateDao.upsertTemplateExercises(data.templateExercises)
+            bodyWeightDao.upsertAll(data.bodyWeightEntries)
+        }
+        settingsDataStore.restore(data.settings)
+    }
+
+    override suspend fun clearAllData() {
+        database.clearAllTables()
+        exerciseDao.insertAll(SeedData.exercises())
+    }
+}
