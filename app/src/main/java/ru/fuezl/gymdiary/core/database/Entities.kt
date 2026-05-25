@@ -30,6 +30,9 @@ data class WorkoutSessionEntity(
     val finishedAt: Long? = null,
     val durationSeconds: Long = 0,
     val note: String = "",
+    val energyLevel: Int? = null,
+    val sleepQuality: Int? = null,
+    val painNote: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
@@ -129,4 +132,27 @@ data class BodyWeightEntryEntity(
     val date: Long,
     val weightKg: Double,
     val note: String = "",
+)
+
+@Serializable
+@Entity(
+    tableName = "exercise_goals",
+    foreignKeys = [
+        ForeignKey(
+            entity = ExerciseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exerciseId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["exerciseId"], unique = true)],
+)
+data class ExerciseGoalEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val exerciseId: Long,
+    val targetWeightKg: Double,
+    val targetReps: Int,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
 )

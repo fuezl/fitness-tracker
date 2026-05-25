@@ -62,6 +62,7 @@ class SettingsViewModel @Inject constructor(
 
     fun updateTheme(themeMode: ThemeMode) = viewModelScope.launch { repository.updateTheme(themeMode) }
     fun updateRestTimer(enabled: Boolean, seconds: Int) = viewModelScope.launch { repository.updateRestTimer(enabled, seconds) }
+    fun updateHaptics(enabled: Boolean) = viewModelScope.launch { repository.updateHaptics(enabled) }
     fun exportData() = viewModelScope.launch {
         runCatching { repository.exportData() }
             .onSuccess { exportChannel.send(it) }
@@ -112,6 +113,7 @@ fun SettingsRoute(
         message = message,
         onTheme = viewModel::updateTheme,
         onRestTimer = viewModel::updateRestTimer,
+        onHaptics = viewModel::updateHaptics,
         onExport = viewModel::exportData,
         onImport = { openDocument.launch(arrayOf("application/json", "text/*")) },
         onClear = viewModel::clearAllData,
@@ -143,6 +145,7 @@ fun SettingsScreen(
     message: String?,
     onTheme: (ThemeMode) -> Unit,
     onRestTimer: (Boolean, Int) -> Unit,
+    onHaptics: (Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClear: () -> Unit,
@@ -175,6 +178,13 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
+        }
+        item { Text("Отклик", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        item {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Вибрация")
+                Switch(checked = settings.hapticsEnabled, onCheckedChange = onHaptics)
+            }
         }
         item { Text("Данные", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
         item {

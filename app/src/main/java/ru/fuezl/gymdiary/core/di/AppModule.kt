@@ -29,12 +29,15 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GymDiaryDatabase =
-        Room.databaseBuilder(context, GymDiaryDatabase::class.java, "gym_diary.db").build()
+        Room.databaseBuilder(context, GymDiaryDatabase::class.java, "gym_diary.db")
+            .addMigrations(GymDiaryDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides fun provideExerciseDao(database: GymDiaryDatabase) = database.exerciseDao()
     @Provides fun provideWorkoutDao(database: GymDiaryDatabase) = database.workoutDao()
     @Provides fun provideWorkoutTemplateDao(database: GymDiaryDatabase) = database.workoutTemplateDao()
     @Provides fun provideBodyWeightDao(database: GymDiaryDatabase) = database.bodyWeightDao()
+    @Provides fun provideExerciseGoalDao(database: GymDiaryDatabase) = database.exerciseGoalDao()
 }
 
 @Module

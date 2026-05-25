@@ -40,6 +40,7 @@ import ru.fuezl.gymdiary.core.common.formatDate
 import ru.fuezl.gymdiary.core.common.formatKg
 import ru.fuezl.gymdiary.core.database.BodyWeightEntryEntity
 import ru.fuezl.gymdiary.core.model.Exercise
+import ru.fuezl.gymdiary.core.model.ExerciseAnalytics
 import ru.fuezl.gymdiary.core.model.ExerciseProgressPoint
 import ru.fuezl.gymdiary.core.model.PersonalRecord
 import ru.fuezl.gymdiary.core.model.WeeklyStats
@@ -57,6 +58,7 @@ data class ProgressUiState(
     val exercises: List<Exercise> = emptyList(),
     val selectedExerciseId: Long? = null,
     val selectedExerciseProgress: List<ExerciseProgressPoint> = emptyList(),
+    val selectedExerciseAnalytics: ExerciseAnalytics = ExerciseAnalytics(),
     val bodyWeight: List<BodyWeightEntryEntity> = emptyList(),
 )
 
@@ -70,6 +72,9 @@ class ProgressViewModel @Inject constructor(
     private val selectedProgress = selectedExerciseId.flatMapLatest { id ->
         if (id == null) kotlinx.coroutines.flow.flowOf(emptyList()) else progressRepository.observeExerciseProgress(id)
     }
+    private val selectedAnalytics = selectedExerciseId.flatMapLatest { id ->
+        if (id == null) kotlinx.coroutines.flow.flowOf(ExerciseAnalytics()) else progressRepository.observeExerciseAnalytics(id)
+    }
     val uiState = combine(
         listOf(
             progressRepository.observeWeeklyStats(),
@@ -77,6 +82,7 @@ class ProgressViewModel @Inject constructor(
             exerciseRepository.observeExercises(),
             selectedExerciseId,
             selectedProgress,
+            selectedAnalytics,
             progressRepository.observeBodyWeight(),
         ),
     ) { values ->
@@ -87,7 +93,8 @@ class ProgressViewModel @Inject constructor(
             exercises = values[2] as List<Exercise>,
             selectedExerciseId = values[3] as Long?,
             selectedExerciseProgress = values[4] as List<ExerciseProgressPoint>,
-            bodyWeight = values[5] as List<BodyWeightEntryEntity>,
+            selectedExerciseAnalytics = values[5] as ExerciseAnalytics,
+            bodyWeight = values[6] as List<BodyWeightEntryEntity>,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
@@ -104,6 +111,18 @@ class ProgressViewModel @Inject constructor(
     fun deleteBodyWeight(id: Long) {
         viewModelScope.launch { progressRepository.deleteBodyWeight(id) }
     }
+
+    fun saveGoal(weight: String, reps: String, note: String) {
+        val exerciseId = selectedExerciseId.value ?: return
+        val weightValue = weight.replace(',', '.').toDoubleOrNull() ?: return
+        val repsValue = reps.toIntOrNull() ?: return
+        viewModelScope.launch { progressRepository.saveExerciseGoal(exerciseId, weightValue, repsValue, note) }
+    }
+
+    fun deleteGoal() {
+        val exerciseId = selectedExerciseId.value ?: return
+        viewModelScope.launch { progressRepository.deleteExerciseGoal(exerciseId) }
+    }
 }
 
 @Composable
@@ -115,7 +134,7 @@ fun ProgressRoute(
     LaunchedEffect(state.exercises) {
         if (state.selectedExerciseId == null) state.exercises.firstOrNull()?.let { viewModel.selectExercise(it.id) }
     }
-    ProgressScreen(state, contentPadding, viewModel::selectExercise, viewModel::addBodyWeight, viewModel::deleteBodyWeight)
+    ProgressScreen(state, contentPadding, viewModel::selectExercise, viewModel::addBodyWeight, viewModel::deleteBodyWeight, viewModel::saveGoal, viewModel::deleteGoal)
 }
 
 @Composable
@@ -125,6 +144,8 @@ fun ProgressScreen(
     onSelectExercise: (Long) -> Unit,
     onAddBodyWeight: (String, String) -> Unit,
     onDeleteBodyWeight: (Long) -> Unit,
+    onSaveGoal: (String, String, String) -> Unit,
+    onDeleteGoal: () -> Unit,
 ) {
     var bodyWeightValue by remember { mutableStateOf("") }
     var bodyWeightNote by remember { mutableStateOf("") }
@@ -151,6 +172,38 @@ fun ProgressScreen(
         item {
             Text("График тренировочного объёма", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             SimpleLineChart(state.selectedExerciseProgress.map { it.volume })
+        }
+        item {
+            Text("График расчётного 1ПМ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            SimpleLineChart(state.selectedExerciseProgress.map { it.bestEstimatedOneRm })
+        }
+        item {
+            ExerciseGoalCard(state, onSaveGoal, onDeleteGoal)
+        }
+        state.selectedExerciseAnalytics.plateauMessage?.let { message ->
+            item {
+                Card {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Плато", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(message)
+                        Text("Проверьте сон, объём и RPE; иногда помогает разгрузочная неделя.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        item { Text("История упражнения", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        if (state.selectedExerciseAnalytics.history.isEmpty()) {
+            item { EmptyState("Нет выполненных подходов по выбранному упражнению") }
+        } else {
+            items(state.selectedExerciseAnalytics.history, key = { it.workoutId }) { entry ->
+                Card {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(formatDate(entry.date), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Макс: ${entry.maxWeight.formatKg()} • объём: ${entry.volume.formatKg()} • 1ПМ: ${entry.bestEstimatedOneRm.formatKg()}")
+                        Text(entry.sets.joinToString("  ") { "${it.weightKg.formatKg()}×${it.reps}" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
         item { Text("Личные рекорды", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
         if (state.personalRecords.isEmpty()) {
@@ -200,6 +253,36 @@ fun ProgressScreen(
                         OutlinedButton(onClick = { onDeleteBodyWeight(entry.id) }) { Text("Удалить") }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseGoalCard(
+    state: ProgressUiState,
+    onSaveGoal: (String, String, String) -> Unit,
+    onDeleteGoal: () -> Unit,
+) {
+    val goal = state.selectedExerciseAnalytics.goal
+    var weight by remember(goal?.id) { mutableStateOf(goal?.targetWeightKg?.toString().orEmpty()) }
+    var reps by remember(goal?.id) { mutableStateOf(goal?.targetReps?.toString().orEmpty()) }
+    var note by remember(goal?.id) { mutableStateOf(goal?.note.orEmpty()) }
+    val latest = state.selectedExerciseAnalytics.history.maxByOrNull { it.bestEstimatedOneRm }
+    val targetOneRm = (weight.replace(',', '.').toDoubleOrNull() ?: 0.0) * (1 + ((reps.toIntOrNull() ?: 0) / 30.0))
+    val progress = if (targetOneRm > 0.0 && latest != null) "${((latest.bestEstimatedOneRm / targetOneRm) * 100).coerceAtMost(100.0).toInt()}%" else "нет данных"
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Цель упражнения", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(weight, { weight = it }, label = { Text("Вес") }, modifier = Modifier.weight(1f), singleLine = true)
+                OutlinedTextField(reps, { reps = it }, label = { Text("Повт.") }, modifier = Modifier.weight(1f), singleLine = true)
+            }
+            OutlinedTextField(note, { note = it }, label = { Text("Заметка") }, modifier = Modifier.fillMaxWidth())
+            Text("Прогресс к цели: $progress", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { onSaveGoal(weight, reps, note) }, modifier = Modifier.weight(1f)) { Text("Сохранить") }
+                OutlinedButton(onClick = onDeleteGoal, modifier = Modifier.weight(1f)) { Text("Удалить") }
             }
         }
     }

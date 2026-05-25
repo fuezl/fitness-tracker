@@ -61,6 +61,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun getSession(id: Long): WorkoutSessionEntity?
 
+    @Query("SELECT * FROM workout_exercises WHERE id = :id")
+    suspend fun getWorkoutExercise(id: Long): WorkoutExerciseEntity?
+
     @Query("SELECT * FROM workout_sessions")
     suspend fun getAllSessions(): List<WorkoutSessionEntity>
 
@@ -102,6 +105,9 @@ interface WorkoutDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertWorkoutExercises(entities: List<WorkoutExerciseEntity>)
+
+    @Update
+    suspend fun updateWorkoutExercise(entity: WorkoutExerciseEntity)
 
     @Query("SELECT * FROM workout_sets WHERE workoutExerciseId = :workoutExerciseId ORDER BY setNumber ASC")
     suspend fun getSets(workoutExerciseId: Long): List<WorkoutSetEntity>
@@ -171,4 +177,22 @@ interface BodyWeightDao {
 
     @Query("DELETE FROM body_weight_entries WHERE id = :id")
     suspend fun delete(id: Long)
+}
+
+@Dao
+interface ExerciseGoalDao {
+    @Query("SELECT * FROM exercise_goals WHERE exerciseId = :exerciseId LIMIT 1")
+    fun observeGoal(exerciseId: Long): Flow<ExerciseGoalEntity?>
+
+    @Query("SELECT * FROM exercise_goals")
+    suspend fun getAll(): List<ExerciseGoalEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(goal: ExerciseGoalEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(goals: List<ExerciseGoalEntity>)
+
+    @Query("DELETE FROM exercise_goals WHERE exerciseId = :exerciseId")
+    suspend fun deleteForExercise(exerciseId: Long)
 }

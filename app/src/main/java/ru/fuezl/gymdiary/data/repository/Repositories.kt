@@ -13,6 +13,8 @@ import ru.fuezl.gymdiary.core.database.BodyWeightDao
 import ru.fuezl.gymdiary.core.database.BodyWeightEntryEntity
 import ru.fuezl.gymdiary.core.database.ExerciseDao
 import ru.fuezl.gymdiary.core.database.ExerciseEntity
+import ru.fuezl.gymdiary.core.database.ExerciseGoalDao
+import ru.fuezl.gymdiary.core.database.ExerciseGoalEntity
 import ru.fuezl.gymdiary.core.database.GymDiaryDatabase
 import ru.fuezl.gymdiary.core.database.SeedData
 import ru.fuezl.gymdiary.core.database.WorkoutDao
@@ -26,6 +28,9 @@ import ru.fuezl.gymdiary.core.database.asModel
 import ru.fuezl.gymdiary.core.datastore.SettingsLocalDataSource
 import ru.fuezl.gymdiary.core.model.Equipment
 import ru.fuezl.gymdiary.core.model.Exercise
+import ru.fuezl.gymdiary.core.model.ExerciseAnalytics
+import ru.fuezl.gymdiary.core.model.ExerciseGoal
+import ru.fuezl.gymdiary.core.model.ExerciseHistoryEntry
 import ru.fuezl.gymdiary.core.model.ExerciseProgressPoint
 import ru.fuezl.gymdiary.core.model.MuscleGroup
 import ru.fuezl.gymdiary.core.model.PersonalRecord
@@ -96,12 +101,16 @@ interface WorkoutRepository {
     fun observeActiveWorkout(): Flow<WorkoutDetails?>
     fun observeWorkoutHistory(): Flow<List<WorkoutSummary>>
     fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?>
+    fun observeExerciseHistoryIndex(): Flow<Map<Long, List<ExerciseHistoryEntry>>>
     suspend fun startWorkout(title: String = "Тренировка"): Long
+    suspend fun startBackfilledWorkout(title: String, startedAt: Long, finishedAt: Long?): Long
     suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long): Long
     suspend fun addSet(workoutExerciseId: Long): Long
     suspend fun updateSet(set: WorkoutSetModel)
     suspend fun completeSet(setId: Long, completed: Boolean)
     suspend fun deleteSet(setId: Long)
+    suspend fun updateWorkoutNote(workoutId: Long, note: String, energyLevel: Int?, sleepQuality: Int?, painNote: String)
+    suspend fun updateWorkoutExerciseNote(workoutExerciseId: Long, note: String)
     suspend fun finishWorkout(workoutId: Long)
     suspend fun deleteWorkout(workoutId: Long)
     suspend fun repeatWorkout(workoutId: Long): Long
@@ -120,9 +129,42 @@ class DefaultWorkoutRepository @Inject constructor(
 
     override fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?> = dao.observeWorkoutDetails(id).map { it?.asDetails() }
 
+    override fun observeExerciseHistoryIndex(): Flow<Map<Long, List<ExerciseHistoryEntry>>> =
+        dao.observeFinishedWorkoutDetails().map { workouts ->
+            workouts.flatMap { workout ->
+                val details = workout.asDetails()
+                details.exercises.mapNotNull { exercise ->
+                    val sets = exercise.sets.filter { it.isCompleted && it.reps > 0 }
+                    if (sets.isEmpty()) null else exercise.exerciseId to ExerciseHistoryEntry(
+                        workoutId = details.summary.id,
+                        date = details.summary.startedAt,
+                        sets = sets,
+                        volume = TrainingCalculators.weightedVolume(sets),
+                        maxWeight = sets.maxOf { it.weightKg },
+                        bestEstimatedOneRm = sets.mapNotNull { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) }.maxOrNull() ?: 0.0,
+                    )
+                }
+            }.groupBy({ it.first }, { it.second }).mapValues { (_, entries) -> entries.sortedByDescending { it.date } }
+        }
+
     override suspend fun startWorkout(title: String): Long {
         val now = System.currentTimeMillis()
         return dao.insertSession(WorkoutSessionEntity(title = title, startedAt = now, createdAt = now, updatedAt = now))
+    }
+
+    override suspend fun startBackfilledWorkout(title: String, startedAt: Long, finishedAt: Long?): Long {
+        val now = System.currentTimeMillis()
+        val normalizedFinish = finishedAt?.takeIf { it >= startedAt }
+        return dao.insertSession(
+            WorkoutSessionEntity(
+                title = title.trim().ifBlank { "Старая тренировка" },
+                startedAt = startedAt,
+                finishedAt = normalizedFinish,
+                durationSeconds = normalizedFinish?.let { ((it - startedAt) / 1000).coerceAtLeast(0) } ?: 0,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
     }
 
     override suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long): Long {
@@ -156,6 +198,24 @@ class DefaultWorkoutRepository @Inject constructor(
     }
 
     override suspend fun deleteSet(setId: Long) = dao.deleteSet(setId)
+
+    override suspend fun updateWorkoutNote(workoutId: Long, note: String, energyLevel: Int?, sleepQuality: Int?, painNote: String) {
+        dao.getSession(workoutId)?.let {
+            dao.updateSession(
+                it.copy(
+                    note = note.trim(),
+                    energyLevel = energyLevel,
+                    sleepQuality = sleepQuality,
+                    painNote = painNote.trim(),
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    override suspend fun updateWorkoutExerciseNote(workoutExerciseId: Long, note: String) {
+        dao.getWorkoutExercise(workoutExerciseId)?.let { dao.updateWorkoutExercise(it.copy(note = note.trim())) }
+    }
 
     override suspend fun finishWorkout(workoutId: Long) {
         val session = dao.getSession(workoutId) ?: return
@@ -251,16 +311,20 @@ interface ProgressRepository {
     fun observeWeeklyStats(): Flow<WeeklyStats>
     fun observePersonalRecords(): Flow<List<PersonalRecord>>
     fun observeExerciseProgress(exerciseId: Long): Flow<List<ExerciseProgressPoint>>
+    fun observeExerciseAnalytics(exerciseId: Long): Flow<ExerciseAnalytics>
     fun observeLastWeights(): Flow<List<Pair<String, Double>>>
     fun observeBodyWeight(): Flow<List<BodyWeightEntryEntity>>
     suspend fun addBodyWeight(weightKg: Double, note: String)
     suspend fun deleteBodyWeight(id: Long)
+    suspend fun saveExerciseGoal(exerciseId: Long, targetWeightKg: Double, targetReps: Int, note: String)
+    suspend fun deleteExerciseGoal(exerciseId: Long)
 }
 
 @Singleton
 class DefaultProgressRepository @Inject constructor(
     private val workoutDao: WorkoutDao,
     private val bodyWeightDao: BodyWeightDao,
+    private val goalDao: ExerciseGoalDao,
 ) : ProgressRepository {
     override fun observeWeeklyStats(): Flow<WeeklyStats> =
         workoutDao.observeFinishedWorkoutDetails().map { workouts ->
@@ -295,8 +359,33 @@ class DefaultProgressRepository @Inject constructor(
                     date = details.summary.startedAt,
                     maxWeight = exerciseSets.maxOf { it.weightKg },
                     volume = TrainingCalculators.weightedVolume(exerciseSets),
+                    bestEstimatedOneRm = exerciseSets.mapNotNull { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) }.maxOrNull() ?: 0.0,
                 )
             }.sortedBy { it.date }
+        }
+
+    override fun observeExerciseAnalytics(exerciseId: Long): Flow<ExerciseAnalytics> =
+        combine(workoutDao.observeFinishedWorkoutDetails(), goalDao.observeGoal(exerciseId)) { workouts, goal ->
+            val history = workouts.mapNotNull { workout ->
+                val details = workout.asDetails()
+                val sets = details.exercises
+                    .filter { it.exerciseId == exerciseId }
+                    .flatMap { it.sets }
+                    .filter { it.isCompleted && it.reps > 0 }
+                if (sets.isEmpty()) null else ExerciseHistoryEntry(
+                    workoutId = details.summary.id,
+                    date = details.summary.startedAt,
+                    sets = sets,
+                    volume = TrainingCalculators.weightedVolume(sets),
+                    maxWeight = sets.maxOf { it.weightKg },
+                    bestEstimatedOneRm = sets.mapNotNull { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) }.maxOrNull() ?: 0.0,
+                )
+            }.sortedByDescending { it.date }
+            ExerciseAnalytics(
+                history = history,
+                plateauMessage = detectPlateau(history),
+                goal = goal?.let { ExerciseGoal(it.id, it.exerciseId, it.targetWeightKg, it.targetReps, it.note) },
+            )
         }
 
     override fun observeLastWeights(): Flow<List<Pair<String, Double>>> =
@@ -317,12 +406,42 @@ class DefaultProgressRepository @Inject constructor(
     override suspend fun deleteBodyWeight(id: Long) {
         bodyWeightDao.delete(id)
     }
+
+    override suspend fun saveExerciseGoal(exerciseId: Long, targetWeightKg: Double, targetReps: Int, note: String) {
+        if (targetWeightKg <= 0.0 || targetReps <= 0) return
+        val now = System.currentTimeMillis()
+        val existing = goalDao.getAll().firstOrNull { it.exerciseId == exerciseId }
+        goalDao.upsert(
+            ExerciseGoalEntity(
+                id = existing?.id ?: 0,
+                exerciseId = exerciseId,
+                targetWeightKg = targetWeightKg,
+                targetReps = targetReps,
+                note = note.trim(),
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now,
+            ),
+        )
+    }
+
+    override suspend fun deleteExerciseGoal(exerciseId: Long) {
+        goalDao.deleteForExercise(exerciseId)
+    }
+
+    private fun detectPlateau(history: List<ExerciseHistoryEntry>): String? {
+        if (history.size < 4) return null
+        val recent = history.take(4)
+        val bestBefore = history.drop(4).maxOfOrNull { it.bestEstimatedOneRm } ?: return null
+        val recentBest = recent.maxOf { it.bestEstimatedOneRm }
+        return if (recentBest <= bestBefore * 1.01) "Похоже на плато: последние 4 тренировки без заметного роста 1ПМ." else null
+    }
 }
 
 interface SettingsRepository {
     fun observeSettings(): Flow<UserSettings>
     suspend fun updateTheme(themeMode: ThemeMode)
     suspend fun updateRestTimer(enabled: Boolean, seconds: Int)
+    suspend fun updateHaptics(enabled: Boolean)
     suspend fun exportData(): String
     suspend fun importData(json: String)
     suspend fun clearAllData()
@@ -337,6 +456,7 @@ data class ExportData(
     val templates: List<ru.fuezl.gymdiary.core.database.WorkoutTemplateEntity>,
     val templateExercises: List<ru.fuezl.gymdiary.core.database.WorkoutTemplateExerciseEntity>,
     val bodyWeightEntries: List<BodyWeightEntryEntity> = emptyList(),
+    val exerciseGoals: List<ExerciseGoalEntity> = emptyList(),
     val settings: UserSettings,
 )
 
@@ -347,6 +467,7 @@ class DefaultSettingsRepository @Inject constructor(
     private val workoutDao: WorkoutDao,
     private val templateDao: WorkoutTemplateDao,
     private val bodyWeightDao: BodyWeightDao,
+    private val goalDao: ExerciseGoalDao,
     private val settingsDataStore: SettingsLocalDataSource,
 ) : SettingsRepository {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
@@ -357,6 +478,8 @@ class DefaultSettingsRepository @Inject constructor(
 
     override suspend fun updateRestTimer(enabled: Boolean, seconds: Int) = settingsDataStore.updateRestTimer(enabled, seconds)
 
+    override suspend fun updateHaptics(enabled: Boolean) = settingsDataStore.updateHaptics(enabled)
+
     override suspend fun exportData(): String = json.encodeToString(
         ExportData(
             exercises = exerciseDao.getAll(),
@@ -366,6 +489,7 @@ class DefaultSettingsRepository @Inject constructor(
             templates = templateDao.getAllTemplates(),
             templateExercises = templateDao.getAllTemplateExercises(),
             bodyWeightEntries = bodyWeightDao.getAll(),
+            exerciseGoals = goalDao.getAll(),
             settings = settingsDataStore.settings.first(),
         ),
     )
@@ -381,6 +505,7 @@ class DefaultSettingsRepository @Inject constructor(
             templateDao.upsertTemplates(data.templates)
             templateDao.upsertTemplateExercises(data.templateExercises)
             bodyWeightDao.upsertAll(data.bodyWeightEntries)
+            goalDao.upsertAll(data.exerciseGoals)
         }
         settingsDataStore.restore(data.settings)
     }

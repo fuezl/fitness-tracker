@@ -24,10 +24,13 @@ fun WorkoutSessionWithDetails.asDetails(): WorkoutDetails {
         setCount = sets.count { it.isCompleted },
         totalVolume = TrainingCalculators.weightedVolume(sets),
         bodyweightReps = TrainingCalculators.bodyweightReps(sets),
+        energyLevel = session.energyLevel,
+        sleepQuality = session.sleepQuality,
     )
     return WorkoutDetails(
         summary = summary,
         note = session.note,
+        painNote = session.painNote,
         exercises = sortedExercises.map {
             WorkoutExerciseDetails(
                 workoutExerciseId = it.workoutExercise.id,

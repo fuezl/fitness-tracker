@@ -23,6 +23,7 @@ interface SettingsLocalDataSource {
     val settings: Flow<UserSettings>
     suspend fun updateTheme(themeMode: ThemeMode)
     suspend fun updateRestTimer(enabled: Boolean, seconds: Int)
+    suspend fun updateHaptics(enabled: Boolean)
     suspend fun restore(settings: UserSettings)
 }
 
@@ -33,6 +34,7 @@ class SettingsDataStore @Inject constructor(
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val defaultRestTimerKey = intPreferencesKey("default_rest_timer_seconds")
     private val restTimerEnabledKey = booleanPreferencesKey("rest_timer_enabled")
+    private val hapticsEnabledKey = booleanPreferencesKey("haptics_enabled")
     private val weightUnitKey = stringPreferencesKey("weight_unit")
 
     override val settings: Flow<UserSettings> = context.settingsDataStore.data.map { preferences ->
@@ -40,6 +42,7 @@ class SettingsDataStore @Inject constructor(
             themeMode = preferences[themeModeKey]?.let(ThemeMode::valueOf) ?: ThemeMode.SYSTEM,
             defaultRestTimerSeconds = preferences[defaultRestTimerKey] ?: 90,
             restTimerEnabled = preferences[restTimerEnabledKey] ?: true,
+            hapticsEnabled = preferences[hapticsEnabledKey] ?: true,
             weightUnit = preferences[weightUnitKey]?.let(WeightUnit::valueOf) ?: WeightUnit.KG,
         )
     }
@@ -55,11 +58,16 @@ class SettingsDataStore @Inject constructor(
         }
     }
 
+    override suspend fun updateHaptics(enabled: Boolean) {
+        context.settingsDataStore.edit { it[hapticsEnabledKey] = enabled }
+    }
+
     override suspend fun restore(settings: UserSettings) {
         context.settingsDataStore.edit {
             it[themeModeKey] = settings.themeMode.name
             it[defaultRestTimerKey] = settings.defaultRestTimerSeconds
             it[restTimerEnabledKey] = settings.restTimerEnabled
+            it[hapticsEnabledKey] = settings.hapticsEnabled
             it[weightUnitKey] = settings.weightUnit.name
         }
     }

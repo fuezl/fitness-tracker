@@ -62,12 +62,15 @@ data class WorkoutSummary(
     val setCount: Int,
     val totalVolume: Double,
     val bodyweightReps: Int,
+    val energyLevel: Int? = null,
+    val sleepQuality: Int? = null,
 )
 
 @Serializable
 data class WorkoutDetails(
     val summary: WorkoutSummary,
     val note: String,
+    val painNote: String,
     val exercises: List<WorkoutExerciseDetails>,
 )
 
@@ -98,6 +101,7 @@ data class UserSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val defaultRestTimerSeconds: Int = 90,
     val restTimerEnabled: Boolean = true,
+    val hapticsEnabled: Boolean = true,
     val weightUnit: WeightUnit = WeightUnit.KG,
 )
 
@@ -120,4 +124,28 @@ data class ExerciseProgressPoint(
     val date: Long,
     val maxWeight: Double,
     val volume: Double,
+    val bestEstimatedOneRm: Double,
+)
+
+data class ExerciseHistoryEntry(
+    val workoutId: Long,
+    val date: Long,
+    val sets: List<WorkoutSetModel>,
+    val volume: Double,
+    val maxWeight: Double,
+    val bestEstimatedOneRm: Double,
+)
+
+data class ExerciseGoal(
+    val id: Long,
+    val exerciseId: Long,
+    val targetWeightKg: Double,
+    val targetReps: Int,
+    val note: String,
+)
+
+data class ExerciseAnalytics(
+    val history: List<ExerciseHistoryEntry> = emptyList(),
+    val plateauMessage: String? = null,
+    val goal: ExerciseGoal? = null,
 )

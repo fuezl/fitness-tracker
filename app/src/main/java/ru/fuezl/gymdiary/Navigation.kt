@@ -125,6 +125,7 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                 StartWorkoutRoute(
                     contentPadding = padding,
                     onActiveWorkout = { navController.navigate(Routes.ACTIVE_WORKOUT) },
+                    onHistory = { navController.navigate(Routes.HISTORY) },
                 )
             }
             composable(Routes.ACTIVE_WORKOUT) {

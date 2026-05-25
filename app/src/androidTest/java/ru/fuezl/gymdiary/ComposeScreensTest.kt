@@ -8,11 +8,18 @@ import org.junit.Rule
 import org.junit.Test
 import ru.fuezl.gymdiary.core.model.Equipment
 import ru.fuezl.gymdiary.core.model.Exercise
+import ru.fuezl.gymdiary.core.model.ExerciseAnalytics
+import ru.fuezl.gymdiary.core.model.ExerciseGoal
+import ru.fuezl.gymdiary.core.model.ExerciseHistoryEntry
+import ru.fuezl.gymdiary.core.model.ExerciseProgressPoint
 import ru.fuezl.gymdiary.core.model.MuscleGroup
+import ru.fuezl.gymdiary.core.model.WeeklyStats
 import ru.fuezl.gymdiary.core.model.WorkoutDetails
 import ru.fuezl.gymdiary.core.model.WorkoutExerciseDetails
 import ru.fuezl.gymdiary.core.model.WorkoutSetModel
 import ru.fuezl.gymdiary.core.model.WorkoutSummary
+import ru.fuezl.gymdiary.feature.progress.ProgressScreen
+import ru.fuezl.gymdiary.feature.progress.ProgressUiState
 import ru.fuezl.gymdiary.feature.dashboard.DashboardScreen
 import ru.fuezl.gymdiary.feature.dashboard.DashboardUiState
 import ru.fuezl.gymdiary.feature.exercises.ExerciseEditScreen
@@ -74,13 +81,18 @@ class ComposeScreensTest {
     fun activeWorkout_displaysAddSetButton() {
         composeRule.setContent {
             ActiveWorkoutScreen(
-                state = ActiveWorkoutUiState(workout = sampleWorkout()),
+                state = ActiveWorkoutUiState(
+                    workout = sampleWorkout(),
+                    exerciseHistory = mapOf(1L to listOf(sampleHistoryEntry())),
+                ),
                 contentPadding = PaddingValues(),
                 onAddExercise = {},
                 onAddSet = {},
                 onUpdateSet = { _, _, _, _, _ -> },
                 onCompleteSet = { _, _ -> },
                 onDeleteSet = {},
+                onUpdateWorkoutNote = { _, _, _, _ -> },
+                onUpdateExerciseNote = { _, _ -> },
                 onShowFinish = {},
                 onHideFinish = {},
                 onFinish = {},
@@ -92,6 +104,38 @@ class ComposeScreensTest {
         }
 
         composeRule.onNodeWithText("Добавить подход").assertIsDisplayed()
+        composeRule.onNodeWithText("+2.5").assertIsDisplayed()
+        composeRule.onNodeWithText("Заметка к упражнению").assertIsDisplayed()
+        composeRule.onNodeWithText("Энергия 1-5").assertIsDisplayed()
+    }
+
+    @Test
+    fun progressScreen_displaysGoalHistoryAndPlateau() {
+        composeRule.setContent {
+            ProgressScreen(
+                state = ProgressUiState(
+                    weeklyStats = WeeklyStats(workouts = 2, sets = 6, volume = 1200.0),
+                    exercises = listOf(sampleExercise()),
+                    selectedExerciseId = 1,
+                    selectedExerciseProgress = listOf(ExerciseProgressPoint(1, 100.0, 500.0, 116.6)),
+                    selectedExerciseAnalytics = ExerciseAnalytics(
+                        history = listOf(sampleHistoryEntry()),
+                        plateauMessage = "Похоже на плато",
+                        goal = ExerciseGoal(1, 1, 120.0, 5, "цель"),
+                    ),
+                ),
+                contentPadding = PaddingValues(),
+                onSelectExercise = {},
+                onAddBodyWeight = { _, _ -> },
+                onDeleteBodyWeight = {},
+                onSaveGoal = { _, _, _ -> },
+                onDeleteGoal = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Цель упражнения").assertIsDisplayed()
+        composeRule.onNodeWithText("История упражнения").assertIsDisplayed()
+        composeRule.onNodeWithText("Плато").assertIsDisplayed()
     }
 
     private fun sampleExercise(): Exercise =
@@ -101,6 +145,7 @@ class ComposeScreensTest {
         WorkoutDetails(
             summary = WorkoutSummary(1, "Тренировка", 0, 0, 1, 0, 0.0, 0),
             note = "",
+            painNote = "",
             exercises = listOf(
                 WorkoutExerciseDetails(
                     workoutExerciseId = 1,
@@ -112,5 +157,15 @@ class ComposeScreensTest {
                     ),
                 ),
             ),
+        )
+
+    private fun sampleHistoryEntry(): ExerciseHistoryEntry =
+        ExerciseHistoryEntry(
+            workoutId = 1,
+            date = 1,
+            sets = listOf(WorkoutSetModel(1, 1, 1, 100.0, 5, 8.0, true, "", 0)),
+            volume = 500.0,
+            maxWeight = 100.0,
+            bestEstimatedOneRm = 116.6,
         )
 }

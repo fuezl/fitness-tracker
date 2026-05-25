@@ -20,10 +20,31 @@ class CalculatorsTest {
     }
 
     @Test
+    fun weightedVolume_returnsZeroForEmptyIncompleteZeroAndNegativeInputs() {
+        assertEquals(0.0, TrainingCalculators.weightedVolume(emptyList()), 0.001)
+        assertEquals(
+            0.0,
+            TrainingCalculators.weightedVolume(
+                listOf(
+                    set(weightKg = 100.0, reps = 5, isCompleted = false),
+                    set(weightKg = 0.0, reps = 10, isCompleted = true),
+                    set(weightKg = -10.0, reps = 10, isCompleted = true),
+                    set(weightKg = 100.0, reps = 0, isCompleted = true),
+                    set(weightKg = 100.0, reps = -1, isCompleted = true),
+                ),
+            ),
+            0.001,
+        )
+    }
+
+    @Test
     fun estimatedOneRm_usesEpleyFormula() {
         assertEquals(120.0, TrainingCalculators.estimatedOneRm(100.0, 6) ?: 0.0, 0.001)
         assertNull(TrainingCalculators.estimatedOneRm(0.0, 6))
+        assertNull(TrainingCalculators.estimatedOneRm(-1.0, 6))
         assertNull(TrainingCalculators.estimatedOneRm(100.0, 0))
+        assertNull(TrainingCalculators.estimatedOneRm(100.0, -1))
+        assertEquals(103.333, TrainingCalculators.estimatedOneRm(100.0, 1) ?: 0.0, 0.001)
     }
 
     @Test
@@ -35,6 +56,18 @@ class CalculatorsTest {
         )
 
         assertEquals(10, TrainingCalculators.bodyweightReps(sets))
+    }
+
+    @Test
+    fun bodyweightReps_ignoresWeightedIncompleteAndInvalidReps() {
+        val sets = listOf(
+            set(weightKg = 0.0, reps = 0, isCompleted = true),
+            set(weightKg = 0.0, reps = -2, isCompleted = true),
+            set(weightKg = 0.0, reps = 5, isCompleted = false),
+            set(weightKg = 20.0, reps = 5, isCompleted = true),
+        )
+
+        assertEquals(0, TrainingCalculators.bodyweightReps(sets))
     }
 
     @Test
