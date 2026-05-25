@@ -13,7 +13,7 @@ class CalculatorsTest {
             set(weightKg = 100.0, reps = 5, isCompleted = true),
             set(weightKg = 80.0, reps = 8, isCompleted = true),
             set(weightKg = 60.0, reps = 10, isCompleted = false),
-            set(weightKg = 0.0, reps = 12, isCompleted = true),
+            set(weightKg = 0.0, reps = 12, isCompleted = true)
         )
 
         assertEquals(1140.0, TrainingCalculators.weightedVolume(sets), 0.001)
@@ -30,10 +30,10 @@ class CalculatorsTest {
                     set(weightKg = 0.0, reps = 10, isCompleted = true),
                     set(weightKg = -10.0, reps = 10, isCompleted = true),
                     set(weightKg = 100.0, reps = 0, isCompleted = true),
-                    set(weightKg = 100.0, reps = -1, isCompleted = true),
-                ),
+                    set(weightKg = 100.0, reps = -1, isCompleted = true)
+                )
             ),
-            0.001,
+            0.001
         )
     }
 
@@ -52,7 +52,7 @@ class CalculatorsTest {
         val sets = listOf(
             set(weightKg = 0.0, reps = 10, isCompleted = true),
             set(weightKg = 0.0, reps = 8, isCompleted = false),
-            set(weightKg = 50.0, reps = 10, isCompleted = true),
+            set(weightKg = 50.0, reps = 10, isCompleted = true)
         )
 
         assertEquals(10, TrainingCalculators.bodyweightReps(sets))
@@ -64,7 +64,7 @@ class CalculatorsTest {
             set(weightKg = 0.0, reps = 0, isCompleted = true),
             set(weightKg = 0.0, reps = -2, isCompleted = true),
             set(weightKg = 0.0, reps = 5, isCompleted = false),
-            set(weightKg = 20.0, reps = 5, isCompleted = true),
+            set(weightKg = 20.0, reps = 5, isCompleted = true)
         )
 
         assertEquals(0, TrainingCalculators.bodyweightReps(sets))
@@ -77,19 +77,17 @@ class CalculatorsTest {
         assertEquals(listOf(2L, 3L, 1L), sorted.map { it.id })
     }
 
-    private fun set(weightKg: Double, reps: Int, isCompleted: Boolean): WorkoutSetModel =
-        WorkoutSetModel(
-            id = 1,
-            workoutExerciseId = 1,
-            setNumber = 1,
-            weightKg = weightKg,
-            reps = reps,
-            rpe = null,
-            isCompleted = isCompleted,
-            note = "",
-            createdAt = 0,
-        )
+    private fun set(weightKg: Double, reps: Int, isCompleted: Boolean): WorkoutSetModel = WorkoutSetModel(
+        id = 1,
+        workoutExerciseId = 1,
+        setNumber = 1,
+        weightKg = weightKg,
+        reps = reps,
+        rpe = null,
+        isCompleted = isCompleted,
+        note = "",
+        createdAt = 0
+    )
 
-    private fun summary(id: Long, startedAt: Long): WorkoutSummary =
-        WorkoutSummary(id, "Тренировка", startedAt, 0, 0, 0, 0.0, 0)
+    private fun summary(id: Long, startedAt: Long): WorkoutSummary = WorkoutSummary(id, "Тренировка", startedAt, 0, 0, 0, 0.0, 0)
 }

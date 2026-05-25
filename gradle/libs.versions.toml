@@ -3,6 +3,7 @@ agp = "9.2.1"
 kotlin = "2.3.21"
 ksp = "2.3.8"
 hilt = "2.59.2"
+ktlintGradle = "14.2.0"
 composeBom = "2026.05.01"
 activityCompose = "1.13.0"
 coreKtx = "1.18.0"
@@ -59,3 +60,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }

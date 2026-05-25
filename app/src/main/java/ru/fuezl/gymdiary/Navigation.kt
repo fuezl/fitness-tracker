@@ -1,17 +1,17 @@
 package ru.fuezl.gymdiary
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -20,8 +20,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -64,7 +64,7 @@ private val bottomItems = listOf(
     BottomItem(Routes.EXERCISES, "Упражнения", Icons.Default.FitnessCenter),
     BottomItem(Routes.START_WORKOUT, "Тренировка", Icons.Default.FitnessCenter),
     BottomItem(Routes.HISTORY, "История", Icons.Default.History),
-    BottomItem(Routes.MORE, "Ещё", Icons.Default.MoreHoriz),
+    BottomItem(Routes.MORE, "Ещё", Icons.Default.MoreHoriz)
 )
 
 @Composable
@@ -90,12 +90,12 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                                 }
                             },
                             icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) },
+                            label = { Text(item.label) }
                         )
                     }
                 }
             }
-        },
+        }
     ) { padding ->
         NavHost(navController = navController, startDestination = Routes.DASHBOARD) {
             composable(Routes.DASHBOARD) {
@@ -105,19 +105,19 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                     onExercises = { navController.navigate(Routes.EXERCISES) },
                     onHistory = { navController.navigate(Routes.HISTORY) },
                     onProgress = { navController.navigate(Routes.PROGRESS) },
-                    onWorkoutDetails = { navController.navigate("details/$it") },
+                    onWorkoutDetails = { navController.navigate("details/$it") }
                 )
             }
             composable(Routes.EXERCISES) {
                 ExercisesRoute(
                     contentPadding = padding,
                     onAdd = { navController.navigate("exerciseEdit/0") },
-                    onEdit = { navController.navigate("exerciseEdit/$it") },
+                    onEdit = { navController.navigate("exerciseEdit/$it") }
                 )
             }
             composable(
                 Routes.EXERCISE_EDIT,
-                arguments = listOf(navArgument("exerciseId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("exerciseId") { type = NavType.LongType })
             ) {
                 ExerciseEditRoute(onBack = { navController.popBackStack() })
             }
@@ -125,7 +125,7 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                 StartWorkoutRoute(
                     contentPadding = padding,
                     onActiveWorkout = { navController.navigate(Routes.ACTIVE_WORKOUT) },
-                    onHistory = { navController.navigate(Routes.HISTORY) },
+                    onHistory = { navController.navigate(Routes.HISTORY) }
                 )
             }
             composable(Routes.ACTIVE_WORKOUT) {
@@ -136,12 +136,12 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.HISTORY) {
                             popUpTo(Routes.START_WORKOUT) { inclusive = true }
                         }
-                    },
+                    }
                 )
             }
             composable(
                 Routes.ADD_EXERCISE,
-                arguments = listOf(navArgument("workoutId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
             ) {
                 AddExerciseToWorkoutRoute(onBack = { navController.popBackStack() })
             }
@@ -150,7 +150,7 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
             }
             composable(
                 Routes.DETAILS,
-                arguments = listOf(navArgument("workoutId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
             ) {
                 WorkoutDetailsRoute(
                     onBack = { navController.popBackStack() },
@@ -158,7 +158,7 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.ACTIVE_WORKOUT) {
                             popUpTo(Routes.HISTORY)
                         }
-                    },
+                    }
                 )
             }
             composable(Routes.PROGRESS) { ProgressRoute(contentPadding = padding) }
@@ -167,7 +167,7 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
                 MoreRoute(
                     contentPadding = padding,
                     onProgress = { navController.navigate(Routes.PROGRESS) },
-                    onSettings = { navController.navigate(Routes.SETTINGS) },
+                    onSettings = { navController.navigate(Routes.SETTINGS) }
                 )
             }
         }
@@ -175,14 +175,13 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
 }
 
 @Composable
-private fun MoreRoute(
-    contentPadding: PaddingValues,
-    onProgress: () -> Unit,
-    onSettings: () -> Unit,
-) {
+private fun MoreRoute(contentPadding: PaddingValues, onProgress: () -> Unit, onSettings: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(contentPadding).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         ru.fuezl.gymdiary.core.ui.GymDiaryTopBar("Ещё")
         Button(onClick = onProgress, modifier = Modifier.fillMaxWidth()) {

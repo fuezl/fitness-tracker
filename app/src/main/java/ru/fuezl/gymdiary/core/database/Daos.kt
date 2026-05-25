@@ -24,7 +24,7 @@ interface ExerciseDao {
         AND (:muscleGroup IS NULL OR muscleGroup = :muscleGroup)
         AND (:equipment IS NULL OR equipment = :equipment)
         ORDER BY name COLLATE NOCASE ASC
-        """,
+        """
     )
     fun searchExercises(query: String, muscleGroup: String?, equipment: String?): Flow<List<ExerciseEntity>>
 

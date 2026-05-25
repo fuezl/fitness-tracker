@@ -89,8 +89,8 @@ class GymDiaryDatabaseTest {
                 note = "note",
                 energyLevel = 4,
                 sleepQuality = 3,
-                painNote = "нет",
-            ),
+                painNote = "нет"
+            )
         )
 
         val session = workoutDao.getSession(sessionId)

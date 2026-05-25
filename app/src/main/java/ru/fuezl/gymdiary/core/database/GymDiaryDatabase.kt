@@ -14,10 +14,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WorkoutTemplateEntity::class,
         WorkoutTemplateExerciseEntity::class,
         BodyWeightEntryEntity::class,
-        ExerciseGoalEntity::class,
+        ExerciseGoalEntity::class
     ],
     version = 2,
-    exportSchema = true,
+    exportSchema = true
 )
 abstract class GymDiaryDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
@@ -44,7 +44,7 @@ abstract class GymDiaryDatabase : RoomDatabase() {
                         updatedAt INTEGER NOT NULL,
                         FOREIGN KEY(exerciseId) REFERENCES exercises(id) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
-                    """.trimIndent(),
+                    """.trimIndent()
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_exercise_goals_exerciseId ON exercise_goals(exerciseId)")
             }

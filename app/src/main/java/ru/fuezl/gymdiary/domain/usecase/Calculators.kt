@@ -8,12 +8,10 @@ object TrainingCalculators {
         return weightKg * (1 + reps / 30.0)
     }
 
-    fun weightedVolume(sets: List<WorkoutSetModel>): Double =
-        sets.filter { it.isCompleted && it.weightKg > 0.0 && it.reps > 0 }
-            .sumOf { it.weightKg * it.reps }
+    fun weightedVolume(sets: List<WorkoutSetModel>): Double = sets.filter { it.isCompleted && it.weightKg > 0.0 && it.reps > 0 }
+        .sumOf { it.weightKg * it.reps }
 
-    fun bodyweightReps(sets: List<WorkoutSetModel>): Int =
-        sets.filter { it.isCompleted && it.weightKg == 0.0 && it.reps > 0 }.sumOf { it.reps }
+    fun bodyweightReps(sets: List<WorkoutSetModel>): Int = sets.filter { it.isCompleted && it.weightKg == 0.0 && it.reps > 0 }.sumOf { it.reps }
 }
 
 object ExerciseValidator {

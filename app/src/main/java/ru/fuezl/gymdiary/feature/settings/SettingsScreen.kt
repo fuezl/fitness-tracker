@@ -15,8 +15,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -51,9 +51,7 @@ import ru.fuezl.gymdiary.data.repository.SettingsRepository
 import javax.inject.Inject
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val repository: SettingsRepository,
-) : ViewModel() {
+class SettingsViewModel @Inject constructor(private val repository: SettingsRepository) : ViewModel() {
     val settings = repository.observeSettings().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
     private val messagesChannel = Channel<String>(Channel.BUFFERED)
     val messages = messagesChannel.receiveAsFlow()
@@ -82,10 +80,7 @@ class SettingsViewModel @Inject constructor(
 }
 
 @Composable
-fun SettingsRoute(
-    contentPadding: PaddingValues,
-    viewModel: SettingsViewModel = hiltViewModel(),
-) {
+fun SettingsRoute(contentPadding: PaddingValues, viewModel: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var pendingExport by remember { mutableStateOf<String?>(null) }
@@ -116,7 +111,7 @@ fun SettingsRoute(
         onHaptics = viewModel::updateHaptics,
         onExport = viewModel::exportData,
         onImport = { openDocument.launch(arrayOf("application/json", "text/*")) },
-        onClear = viewModel::clearAllData,
+        onClear = viewModel::clearAllData
     )
     if (importConfirm != null) {
         AlertDialog(
@@ -133,7 +128,7 @@ fun SettingsRoute(
                     }
                 }) { Text("Продолжить") }
             },
-            dismissButton = { TextButton(onClick = { importConfirm = null }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { importConfirm = null }) { Text("Отмена") } }
         )
     }
 }
@@ -148,14 +143,16 @@ fun SettingsScreen(
     onHaptics: (Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    onClear: () -> Unit,
+    onClear: () -> Unit
 ) {
     var clearConfirm by remember { mutableStateOf(false) }
     var restSeconds by remember(settings.defaultRestTimerSeconds) { mutableStateOf(settings.defaultRestTimerSeconds.toString()) }
     LazyColumn(
-        Modifier.fillMaxSize().padding(contentPadding),
+        Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { GymDiaryTopBar("Настройки") }
         item { Text("Внешний вид", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
@@ -176,7 +173,7 @@ fun SettingsScreen(
                 },
                 label = { Text("Длительность по умолчанию, сек") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                singleLine = true
             )
         }
         item { Text("Отклик", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
@@ -201,8 +198,13 @@ fun SettingsScreen(
             onDismissRequest = { clearConfirm = false },
             title = { Text("Очистить все данные?") },
             text = { Text("Все тренировки и пользовательские упражнения будут удалены.") },
-            confirmButton = { TextButton(onClick = { clearConfirm = false; onClear() }) { Text("Очистить") } },
-            dismissButton = { TextButton(onClick = { clearConfirm = false }) { Text("Отмена") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    clearConfirm = false
+                    onClear()
+                }) { Text("Очистить") }
+            },
+            dismissButton = { TextButton(onClick = { clearConfirm = false }) { Text("Отмена") } }
         )
     }
 }
@@ -218,11 +220,16 @@ private fun ThemeDropdown(selected: ThemeMode, onSelected: (ThemeMode) -> Unit) 
             readOnly = true,
             label = { Text("Тема") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true).fillMaxWidth(),
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .fillMaxWidth()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ThemeMode.entries.forEach { mode ->
-                DropdownMenuItem(text = { Text(mode.title) }, onClick = { onSelected(mode); expanded = false })
+                DropdownMenuItem(text = { Text(mode.title) }, onClick = {
+                    onSelected(mode)
+                    expanded = false
+                })
             }
         }
     }

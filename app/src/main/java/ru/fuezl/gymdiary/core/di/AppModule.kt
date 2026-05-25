@@ -28,15 +28,18 @@ import javax.inject.Singleton
 object DatabaseModule {
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): GymDiaryDatabase =
-        Room.databaseBuilder(context, GymDiaryDatabase::class.java, "gym_diary.db")
-            .addMigrations(GymDiaryDatabase.MIGRATION_1_2)
-            .build()
+    fun provideDatabase(@ApplicationContext context: Context): GymDiaryDatabase = Room.databaseBuilder(context, GymDiaryDatabase::class.java, "gym_diary.db")
+        .addMigrations(GymDiaryDatabase.MIGRATION_1_2)
+        .build()
 
     @Provides fun provideExerciseDao(database: GymDiaryDatabase) = database.exerciseDao()
+
     @Provides fun provideWorkoutDao(database: GymDiaryDatabase) = database.workoutDao()
+
     @Provides fun provideWorkoutTemplateDao(database: GymDiaryDatabase) = database.workoutTemplateDao()
+
     @Provides fun provideBodyWeightDao(database: GymDiaryDatabase) = database.bodyWeightDao()
+
     @Provides fun provideExerciseGoalDao(database: GymDiaryDatabase) = database.exerciseGoalDao()
 }
 
@@ -44,9 +47,14 @@ object DatabaseModule {
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
     @Binds abstract fun bindSettingsLocalDataSource(impl: SettingsDataStore): SettingsLocalDataSource
+
     @Binds abstract fun bindExerciseRepository(impl: DefaultExerciseRepository): ExerciseRepository
+
     @Binds abstract fun bindWorkoutRepository(impl: DefaultWorkoutRepository): WorkoutRepository
+
     @Binds abstract fun bindWorkoutTemplateRepository(impl: DefaultWorkoutTemplateRepository): WorkoutTemplateRepository
+
     @Binds abstract fun bindProgressRepository(impl: DefaultProgressRepository): ProgressRepository
+
     @Binds abstract fun bindSettingsRepository(impl: DefaultSettingsRepository): SettingsRepository
 }

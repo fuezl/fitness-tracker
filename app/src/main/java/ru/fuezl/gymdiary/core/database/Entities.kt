@@ -18,7 +18,7 @@ data class ExerciseEntity(
     val note: String = "",
     val isCustom: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -34,7 +34,7 @@ data class WorkoutSessionEntity(
     val sleepQuality: Int? = null,
     val painNote: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -45,24 +45,18 @@ data class WorkoutSessionEntity(
             entity = WorkoutSessionEntity::class,
             parentColumns = ["id"],
             childColumns = ["workoutSessionId"],
-            onDelete = ForeignKey.CASCADE,
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = ExerciseEntity::class,
             parentColumns = ["id"],
             childColumns = ["exerciseId"],
-            onDelete = ForeignKey.RESTRICT,
-        ),
+            onDelete = ForeignKey.RESTRICT
+        )
     ],
-    indices = [Index("workoutSessionId"), Index("exerciseId")],
+    indices = [Index("workoutSessionId"), Index("exerciseId")]
 )
-data class WorkoutExerciseEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val workoutSessionId: Long,
-    val exerciseId: Long,
-    val orderIndex: Int,
-    val note: String = "",
-)
+data class WorkoutExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val workoutSessionId: Long, val exerciseId: Long, val orderIndex: Int, val note: String = "")
 
 @Serializable
 @Entity(
@@ -72,10 +66,10 @@ data class WorkoutExerciseEntity(
             entity = WorkoutExerciseEntity::class,
             parentColumns = ["id"],
             childColumns = ["workoutExerciseId"],
-            onDelete = ForeignKey.CASCADE,
-        ),
+            onDelete = ForeignKey.CASCADE
+        )
     ],
-    indices = [Index("workoutExerciseId")],
+    indices = [Index("workoutExerciseId")]
 )
 data class WorkoutSetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -86,7 +80,7 @@ data class WorkoutSetEntity(
     val rpe: Double? = null,
     val isCompleted: Boolean = false,
     val note: String = "",
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -96,7 +90,7 @@ data class WorkoutTemplateEntity(
     val title: String,
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -107,32 +101,22 @@ data class WorkoutTemplateEntity(
             entity = WorkoutTemplateEntity::class,
             parentColumns = ["id"],
             childColumns = ["templateId"],
-            onDelete = ForeignKey.CASCADE,
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = ExerciseEntity::class,
             parentColumns = ["id"],
             childColumns = ["exerciseId"],
-            onDelete = ForeignKey.RESTRICT,
-        ),
+            onDelete = ForeignKey.RESTRICT
+        )
     ],
-    indices = [Index("templateId"), Index("exerciseId")],
+    indices = [Index("templateId"), Index("exerciseId")]
 )
-data class WorkoutTemplateExerciseEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val templateId: Long,
-    val exerciseId: Long,
-    val orderIndex: Int,
-)
+data class WorkoutTemplateExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val templateId: Long, val exerciseId: Long, val orderIndex: Int)
 
 @Serializable
 @Entity(tableName = "body_weight_entries")
-data class BodyWeightEntryEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val date: Long,
-    val weightKg: Double,
-    val note: String = "",
-)
+data class BodyWeightEntryEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val date: Long, val weightKg: Double, val note: String = "")
 
 @Serializable
 @Entity(
@@ -142,10 +126,10 @@ data class BodyWeightEntryEntity(
             entity = ExerciseEntity::class,
             parentColumns = ["id"],
             childColumns = ["exerciseId"],
-            onDelete = ForeignKey.CASCADE,
-        ),
+            onDelete = ForeignKey.CASCADE
+        )
     ],
-    indices = [Index(value = ["exerciseId"], unique = true)],
+    indices = [Index(value = ["exerciseId"], unique = true)]
 )
 data class ExerciseGoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -154,5 +138,5 @@ data class ExerciseGoalEntity(
     val targetReps: Int,
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )

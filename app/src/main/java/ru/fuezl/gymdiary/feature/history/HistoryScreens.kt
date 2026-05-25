@@ -50,18 +50,12 @@ import ru.fuezl.gymdiary.data.repository.WorkoutRepository
 import javax.inject.Inject
 
 @HiltViewModel
-class WorkoutHistoryViewModel @Inject constructor(
-    repository: WorkoutRepository,
-) : ViewModel() {
+class WorkoutHistoryViewModel @Inject constructor(repository: WorkoutRepository) : ViewModel() {
     val history = repository.observeWorkoutHistory().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
 
 @Composable
-fun WorkoutHistoryRoute(
-    contentPadding: PaddingValues,
-    onOpen: (Long) -> Unit,
-    viewModel: WorkoutHistoryViewModel = hiltViewModel(),
-) {
+fun WorkoutHistoryRoute(contentPadding: PaddingValues, onOpen: (Long) -> Unit, viewModel: WorkoutHistoryViewModel = hiltViewModel()) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     WorkoutHistoryScreen(history, contentPadding, onOpen)
 }
@@ -69,9 +63,11 @@ fun WorkoutHistoryRoute(
 @Composable
 fun WorkoutHistoryScreen(history: List<WorkoutSummary>, contentPadding: PaddingValues, onOpen: (Long) -> Unit) {
     LazyColumn(
-        Modifier.fillMaxSize().padding(contentPadding),
+        Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { GymDiaryTopBar("История") }
         if (history.isEmpty()) {
@@ -88,10 +84,7 @@ fun WorkoutHistoryScreen(history: List<WorkoutSummary>, contentPadding: PaddingV
 }
 
 @HiltViewModel
-class WorkoutDetailsViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    private val repository: WorkoutRepository,
-) : ViewModel() {
+class WorkoutDetailsViewModel @Inject constructor(savedStateHandle: SavedStateHandle, private val repository: WorkoutRepository) : ViewModel() {
     private val workoutId: Long = savedStateHandle["workoutId"] ?: 0L
     val details = repository.observeWorkoutDetails(workoutId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val repeatChannel = Channel<Unit>(Channel.BUFFERED)
@@ -115,11 +108,7 @@ class WorkoutDetailsViewModel @Inject constructor(
 }
 
 @Composable
-fun WorkoutDetailsRoute(
-    onBack: () -> Unit,
-    onRepeat: () -> Unit,
-    viewModel: WorkoutDetailsViewModel = hiltViewModel(),
-) {
+fun WorkoutDetailsRoute(onBack: () -> Unit, onRepeat: () -> Unit, viewModel: WorkoutDetailsViewModel = hiltViewModel()) {
     val details by viewModel.details.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.repeatEvents.collect { onRepeat() } }
     LaunchedEffect(Unit) { viewModel.backEvents.collect { onBack() } }
@@ -169,7 +158,7 @@ fun WorkoutDetailsScreen(details: WorkoutDetails?, onBack: () -> Unit, onRepeat:
             title = { Text("Удалить тренировку?") },
             text = { Text("Это действие нельзя отменить.") },
             confirmButton = { TextButton(onClick = onDelete) { Text("Удалить") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } }
         )
     }
 }

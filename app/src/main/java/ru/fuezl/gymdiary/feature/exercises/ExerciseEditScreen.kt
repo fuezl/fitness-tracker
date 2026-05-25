@@ -2,7 +2,6 @@ package ru.fuezl.gymdiary.feature.exercises
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,14 +48,11 @@ data class ExerciseEditUiState(
     val note: String = "",
     val nameError: String? = null,
     val deleteError: String? = null,
-    val isCustom: Boolean = true,
+    val isCustom: Boolean = true
 )
 
 @HiltViewModel
-class ExerciseEditViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    private val repository: ExerciseRepository,
-) : ViewModel() {
+class ExerciseEditViewModel @Inject constructor(savedStateHandle: SavedStateHandle, private val repository: ExerciseRepository) : ViewModel() {
     private val exerciseId: Long = savedStateHandle["exerciseId"] ?: 0L
     val uiState = MutableStateFlow(ExerciseEditUiState(id = exerciseId))
     private val eventsChannel = Channel<Unit>(Channel.BUFFERED)
@@ -66,7 +62,8 @@ class ExerciseEditViewModel @Inject constructor(
         if (exerciseId > 0) {
             viewModelScope.launch {
                 repository.getExercise(exerciseId)?.let { exercise ->
-                    uiState.value = ExerciseEditUiState(exercise.id, exercise.name, exercise.muscleGroup, exercise.equipment, exercise.note, isCustom = exercise.isCustom)
+                    uiState.value =
+                        ExerciseEditUiState(exercise.id, exercise.name, exercise.muscleGroup, exercise.equipment, exercise.note, isCustom = exercise.isCustom)
                 }
             }
         }
@@ -107,13 +104,19 @@ class ExerciseEditViewModel @Inject constructor(
 }
 
 @Composable
-fun ExerciseEditRoute(
-    onBack: () -> Unit,
-    viewModel: ExerciseEditViewModel = hiltViewModel(),
-) {
+fun ExerciseEditRoute(onBack: () -> Unit, viewModel: ExerciseEditViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.events.collect { onBack() } }
-    ExerciseEditScreen(state, onBack, viewModel::onNameChange, viewModel::onMuscleGroupChange, viewModel::onEquipmentChange, viewModel::onNoteChange, viewModel::save, viewModel::delete)
+    ExerciseEditScreen(
+        state,
+        onBack,
+        viewModel::onNameChange,
+        viewModel::onMuscleGroupChange,
+        viewModel::onEquipmentChange,
+        viewModel::onNoteChange,
+        viewModel::save,
+        viewModel::delete
+    )
 }
 
 @Composable
@@ -125,13 +128,16 @@ fun ExerciseEditScreen(
     onEquipmentChange: (Equipment?) -> Unit,
     onNoteChange: (String) -> Unit,
     onSave: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     Scaffold(topBar = { GymDiaryTopBar(if (state.id == 0L) "Новое упражнение" else "Редактирование", onBack) }) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
                 value = state.name,
@@ -139,13 +145,17 @@ fun ExerciseEditScreen(
                 label = { Text("Название") },
                 isError = state.nameError != null,
                 supportingText = { state.nameError?.let { Text(it, Modifier.testTag("exercise_name_error")) } },
-                modifier = Modifier.fillMaxWidth().testTag("exercise_name"),
-                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("exercise_name"),
+                singleLine = true
             )
             EnumDropdown("Группа мышц", state.muscleGroup, MuscleGroup.entries, { it.title }, onMuscleGroupChange, Modifier.fillMaxWidth())
             EnumDropdown("Оборудование", state.equipment, Equipment.entries, { it.title }, onEquipmentChange, Modifier.fillMaxWidth())
             OutlinedTextField(value = state.note, onValueChange = onNoteChange, label = { Text("Комментарий") }, modifier = Modifier.fillMaxWidth())
-            Button(onClick = onSave, modifier = Modifier.fillMaxWidth().testTag("save_exercise")) { Text("Сохранить") }
+            Button(onClick = onSave, modifier = Modifier
+                .fillMaxWidth()
+                .testTag("save_exercise")) { Text("Сохранить") }
             if (state.id > 0 && state.isCustom) {
                 OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Удалить упражнение") }
             }
@@ -157,8 +167,13 @@ fun ExerciseEditScreen(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Удалить упражнение?") },
             text = { Text("Удалить можно только пользовательские упражнения, которые не используются в тренировках.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Удалить") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } }
         )
     }
 }

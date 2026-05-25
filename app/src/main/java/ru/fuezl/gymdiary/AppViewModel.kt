@@ -11,14 +11,11 @@ import ru.fuezl.gymdiary.data.repository.SettingsRepository
 import javax.inject.Inject
 
 @HiltViewModel
-class AppViewModel @Inject constructor(
-    settingsRepository: SettingsRepository,
-    private val exerciseRepository: ExerciseRepository,
-) : ViewModel() {
+class AppViewModel @Inject constructor(settingsRepository: SettingsRepository, private val exerciseRepository: ExerciseRepository) : ViewModel() {
     val settings = settingsRepository.observeSettings().stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        ru.fuezl.gymdiary.core.model.UserSettings(),
+        ru.fuezl.gymdiary.core.model.UserSettings()
     )
 
     init {

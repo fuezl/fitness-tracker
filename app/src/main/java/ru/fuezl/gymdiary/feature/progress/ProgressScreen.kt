@@ -15,8 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,15 +59,12 @@ data class ProgressUiState(
     val selectedExerciseId: Long? = null,
     val selectedExerciseProgress: List<ExerciseProgressPoint> = emptyList(),
     val selectedExerciseAnalytics: ExerciseAnalytics = ExerciseAnalytics(),
-    val bodyWeight: List<BodyWeightEntryEntity> = emptyList(),
+    val bodyWeight: List<BodyWeightEntryEntity> = emptyList()
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class ProgressViewModel @Inject constructor(
-    private val progressRepository: ProgressRepository,
-    exerciseRepository: ExerciseRepository,
-) : ViewModel() {
+class ProgressViewModel @Inject constructor(private val progressRepository: ProgressRepository, exerciseRepository: ExerciseRepository) : ViewModel() {
     private val selectedExerciseId = MutableStateFlow<Long?>(null)
     private val selectedProgress = selectedExerciseId.flatMapLatest { id ->
         if (id == null) kotlinx.coroutines.flow.flowOf(emptyList()) else progressRepository.observeExerciseProgress(id)
@@ -83,8 +80,8 @@ class ProgressViewModel @Inject constructor(
             selectedExerciseId,
             selectedProgress,
             selectedAnalytics,
-            progressRepository.observeBodyWeight(),
-        ),
+            progressRepository.observeBodyWeight()
+        )
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         ProgressUiState(
@@ -94,7 +91,7 @@ class ProgressViewModel @Inject constructor(
             selectedExerciseId = values[3] as Long?,
             selectedExerciseProgress = values[4] as List<ExerciseProgressPoint>,
             selectedExerciseAnalytics = values[5] as ExerciseAnalytics,
-            bodyWeight = values[6] as List<BodyWeightEntryEntity>,
+            bodyWeight = values[6] as List<BodyWeightEntryEntity>
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
@@ -126,15 +123,20 @@ class ProgressViewModel @Inject constructor(
 }
 
 @Composable
-fun ProgressRoute(
-    contentPadding: PaddingValues,
-    viewModel: ProgressViewModel = hiltViewModel(),
-) {
+fun ProgressRoute(contentPadding: PaddingValues, viewModel: ProgressViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.exercises) {
         if (state.selectedExerciseId == null) state.exercises.firstOrNull()?.let { viewModel.selectExercise(it.id) }
     }
-    ProgressScreen(state, contentPadding, viewModel::selectExercise, viewModel::addBodyWeight, viewModel::deleteBodyWeight, viewModel::saveGoal, viewModel::deleteGoal)
+    ProgressScreen(
+        state,
+        contentPadding,
+        viewModel::selectExercise,
+        viewModel::addBodyWeight,
+        viewModel::deleteBodyWeight,
+        viewModel::saveGoal,
+        viewModel::deleteGoal
+    )
 }
 
 @Composable
@@ -145,21 +147,23 @@ fun ProgressScreen(
     onAddBodyWeight: (String, String) -> Unit,
     onDeleteBodyWeight: (Long) -> Unit,
     onSaveGoal: (String, String, String) -> Unit,
-    onDeleteGoal: () -> Unit,
+    onDeleteGoal: () -> Unit
 ) {
     var bodyWeightValue by remember { mutableStateOf("") }
     var bodyWeightNote by remember { mutableStateOf("") }
     LazyColumn(
-        Modifier.fillMaxSize().padding(contentPadding),
+        Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { GymDiaryTopBar("Прогресс") }
         item {
             StatCard(
                 "Текущая неделя",
                 "${state.weeklyStats.workouts} трен. • ${state.weeklyStats.volume.formatKg()}",
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth()
             )
         }
         item {
@@ -226,7 +230,9 @@ fun ProgressScreen(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(bodyWeightValue, { bodyWeightValue = it }, label = { Text("кг") }, modifier = Modifier.weight(1f), singleLine = true)
-                        OutlinedTextField(bodyWeightNote, { bodyWeightNote = it }, label = { Text("Заметка") }, modifier = Modifier.weight(2f), singleLine = true)
+                        OutlinedTextField(bodyWeightNote, {
+                            bodyWeightNote = it
+                        }, label = { Text("Заметка") }, modifier = Modifier.weight(2f), singleLine = true)
                     }
                     Button(
                         onClick = {
@@ -234,7 +240,7 @@ fun ProgressScreen(
                             bodyWeightValue = ""
                             bodyWeightNote = ""
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth()
                     ) { Text("Добавить запись") }
                 }
             }
@@ -244,7 +250,9 @@ fun ProgressScreen(
         } else {
             items(state.bodyWeight, key = { it.id }) { entry ->
                 Card {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text(entry.weightKg.formatKg(), fontWeight = FontWeight.SemiBold)
                             Text(formatDate(entry.date), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -259,18 +267,20 @@ fun ProgressScreen(
 }
 
 @Composable
-private fun ExerciseGoalCard(
-    state: ProgressUiState,
-    onSaveGoal: (String, String, String) -> Unit,
-    onDeleteGoal: () -> Unit,
-) {
+private fun ExerciseGoalCard(state: ProgressUiState, onSaveGoal: (String, String, String) -> Unit, onDeleteGoal: () -> Unit) {
     val goal = state.selectedExerciseAnalytics.goal
     var weight by remember(goal?.id) { mutableStateOf(goal?.targetWeightKg?.toString().orEmpty()) }
     var reps by remember(goal?.id) { mutableStateOf(goal?.targetReps?.toString().orEmpty()) }
     var note by remember(goal?.id) { mutableStateOf(goal?.note.orEmpty()) }
     val latest = state.selectedExerciseAnalytics.history.maxByOrNull { it.bestEstimatedOneRm }
     val targetOneRm = (weight.replace(',', '.').toDoubleOrNull() ?: 0.0) * (1 + ((reps.toIntOrNull() ?: 0) / 30.0))
-    val progress = if (targetOneRm > 0.0 && latest != null) "${((latest.bestEstimatedOneRm / targetOneRm) * 100).coerceAtMost(100.0).toInt()}%" else "нет данных"
+    val progress = if (targetOneRm > 0.0 &&
+        latest != null
+    ) {
+        "${((latest.bestEstimatedOneRm / targetOneRm) * 100).coerceAtMost(100.0).toInt()}%"
+    } else {
+        "нет данных"
+    }
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Цель упражнения", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -289,11 +299,7 @@ private fun ExerciseGoalCard(
 }
 
 @Composable
-private fun ExerciseSelector(
-    exercises: List<Exercise>,
-    selectedExerciseId: Long?,
-    onSelectExercise: (Long) -> Unit,
-) {
+private fun ExerciseSelector(exercises: List<Exercise>, selectedExerciseId: Long?, onSelectExercise: (Long) -> Unit) {
     val selected = exercises.firstOrNull { it.id == selectedExerciseId } ?: exercises.first()
     ru.fuezl.gymdiary.feature.exercises.EnumDropdown(
         label = "Упражнение",
@@ -301,6 +307,8 @@ private fun ExerciseSelector(
         values = exercises,
         title = { it.name },
         onSelected = { it?.let { exercise -> onSelectExercise(exercise.id) } },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
     )
 }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -50,7 +49,7 @@ fun GymDiaryTopBar(title: String, onBack: (() -> Unit)? = null) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
             }
-        },
+        }
     )
 }
 
@@ -63,14 +62,18 @@ fun LoadingState(modifier: Modifier = Modifier) {
 
 @Composable
 fun EmptyState(text: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(modifier
+        .fillMaxWidth()
+        .padding(32.dp), contentAlignment = Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 fun ErrorState(text: String, onRetry: (() -> Unit)? = null) {
-    Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier
+        .fillMaxWidth()
+        .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text, color = MaterialTheme.colorScheme.error)
         if (onRetry != null) {
             Spacer(Modifier.height(8.dp))
@@ -116,18 +119,13 @@ fun WorkoutCard(summary: WorkoutSummary, subtitle: String, onClick: () -> Unit, 
 }
 
 @Composable
-fun ConfirmDeleteDialog(
-    title: String,
-    text: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+fun ConfirmDeleteDialog(title: String, text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Удалить") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
 }
 
@@ -137,7 +135,10 @@ fun SimpleLineChart(values: List<Double>, modifier: Modifier = Modifier, lineCol
         EmptyState("Нет данных для графика", modifier)
         return
     }
-    Canvas(modifier = modifier.fillMaxWidth().height(180.dp).padding(12.dp)) {
+    Canvas(modifier = modifier
+        .fillMaxWidth()
+        .height(180.dp)
+        .padding(12.dp)) {
         val max = values.maxOrNull()?.takeIf { it > 0 } ?: 1.0
         val stepX = size.width / (values.lastIndex)
         val path = Path()

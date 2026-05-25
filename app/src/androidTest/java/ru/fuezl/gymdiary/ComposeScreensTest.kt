@@ -18,14 +18,14 @@ import ru.fuezl.gymdiary.core.model.WorkoutDetails
 import ru.fuezl.gymdiary.core.model.WorkoutExerciseDetails
 import ru.fuezl.gymdiary.core.model.WorkoutSetModel
 import ru.fuezl.gymdiary.core.model.WorkoutSummary
-import ru.fuezl.gymdiary.feature.progress.ProgressScreen
-import ru.fuezl.gymdiary.feature.progress.ProgressUiState
 import ru.fuezl.gymdiary.feature.dashboard.DashboardScreen
 import ru.fuezl.gymdiary.feature.dashboard.DashboardUiState
 import ru.fuezl.gymdiary.feature.exercises.ExerciseEditScreen
 import ru.fuezl.gymdiary.feature.exercises.ExerciseEditUiState
 import ru.fuezl.gymdiary.feature.exercises.ExercisesScreen
 import ru.fuezl.gymdiary.feature.exercises.ExercisesUiState
+import ru.fuezl.gymdiary.feature.progress.ProgressScreen
+import ru.fuezl.gymdiary.feature.progress.ProgressUiState
 import ru.fuezl.gymdiary.feature.workout.ActiveWorkoutScreen
 import ru.fuezl.gymdiary.feature.workout.ActiveWorkoutUiState
 
@@ -52,7 +52,7 @@ class ComposeScreensTest {
                 onEdit = {},
                 onQueryChange = {},
                 onMuscleGroupChange = {},
-                onEquipmentChange = {},
+                onEquipmentChange = {}
             )
         }
 
@@ -70,7 +70,7 @@ class ComposeScreensTest {
                 onEquipmentChange = {},
                 onNoteChange = {},
                 onSave = {},
-                onDelete = {},
+                onDelete = {}
             )
         }
 
@@ -83,7 +83,7 @@ class ComposeScreensTest {
             ActiveWorkoutScreen(
                 state = ActiveWorkoutUiState(
                     workout = sampleWorkout(),
-                    exerciseHistory = mapOf(1L to listOf(sampleHistoryEntry())),
+                    exerciseHistory = mapOf(1L to listOf(sampleHistoryEntry()))
                 ),
                 contentPadding = PaddingValues(),
                 onAddExercise = {},
@@ -99,7 +99,7 @@ class ComposeScreensTest {
                 onAddRest = {},
                 onSkipRest = {},
                 onPauseRest = {},
-                onSaveTemplate = {},
+                onSaveTemplate = {}
             )
         }
 
@@ -121,15 +121,15 @@ class ComposeScreensTest {
                     selectedExerciseAnalytics = ExerciseAnalytics(
                         history = listOf(sampleHistoryEntry()),
                         plateauMessage = "Похоже на плато",
-                        goal = ExerciseGoal(1, 1, 120.0, 5, "цель"),
-                    ),
+                        goal = ExerciseGoal(1, 1, 120.0, 5, "цель")
+                    )
                 ),
                 contentPadding = PaddingValues(),
                 onSelectExercise = {},
                 onAddBodyWeight = { _, _ -> },
                 onDeleteBodyWeight = {},
                 onSaveGoal = { _, _, _ -> },
-                onDeleteGoal = {},
+                onDeleteGoal = {}
             )
         }
 
@@ -138,34 +138,31 @@ class ComposeScreensTest {
         composeRule.onNodeWithText("Плато").assertIsDisplayed()
     }
 
-    private fun sampleExercise(): Exercise =
-        Exercise(1, "Жим штанги лёжа", MuscleGroup.CHEST, Equipment.BARBELL, "", false, 0, 0)
+    private fun sampleExercise(): Exercise = Exercise(1, "Жим штанги лёжа", MuscleGroup.CHEST, Equipment.BARBELL, "", false, 0, 0)
 
-    private fun sampleWorkout(): WorkoutDetails =
-        WorkoutDetails(
-            summary = WorkoutSummary(1, "Тренировка", 0, 0, 1, 0, 0.0, 0),
-            note = "",
-            painNote = "",
-            exercises = listOf(
-                WorkoutExerciseDetails(
-                    workoutExerciseId = 1,
-                    exerciseId = 1,
-                    exerciseName = "Жим штанги лёжа",
-                    note = "",
-                    sets = listOf(
-                        WorkoutSetModel(1, 1, 1, 100.0, 5, null, false, "", 0),
-                    ),
-                ),
-            ),
+    private fun sampleWorkout(): WorkoutDetails = WorkoutDetails(
+        summary = WorkoutSummary(1, "Тренировка", 0, 0, 1, 0, 0.0, 0),
+        note = "",
+        painNote = "",
+        exercises = listOf(
+            WorkoutExerciseDetails(
+                workoutExerciseId = 1,
+                exerciseId = 1,
+                exerciseName = "Жим штанги лёжа",
+                note = "",
+                sets = listOf(
+                    WorkoutSetModel(1, 1, 1, 100.0, 5, null, false, "", 0)
+                )
+            )
         )
+    )
 
-    private fun sampleHistoryEntry(): ExerciseHistoryEntry =
-        ExerciseHistoryEntry(
-            workoutId = 1,
-            date = 1,
-            sets = listOf(WorkoutSetModel(1, 1, 1, 100.0, 5, 8.0, true, "", 0)),
-            volume = 500.0,
-            maxWeight = 100.0,
-            bestEstimatedOneRm = 116.6,
-        )
+    private fun sampleHistoryEntry(): ExerciseHistoryEntry = ExerciseHistoryEntry(
+        workoutId = 1,
+        date = 1,
+        sets = listOf(WorkoutSetModel(1, 1, 1, 100.0, 5, 8.0, true, "", 0)),
+        volume = 500.0,
+        maxWeight = 100.0,
+        bestEstimatedOneRm = 116.6
+    )
 }

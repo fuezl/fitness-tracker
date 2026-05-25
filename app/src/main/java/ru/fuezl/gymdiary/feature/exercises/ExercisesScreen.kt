@@ -1,7 +1,6 @@
 package ru.fuezl.gymdiary.feature.exercises
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,8 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -49,18 +48,11 @@ import ru.fuezl.gymdiary.core.ui.GymDiaryTopBar
 import ru.fuezl.gymdiary.data.repository.ExerciseRepository
 import javax.inject.Inject
 
-data class ExercisesUiState(
-    val query: String = "",
-    val muscleGroup: MuscleGroup? = null,
-    val equipment: Equipment? = null,
-    val exercises: List<Exercise> = emptyList(),
-)
+data class ExercisesUiState(val query: String = "", val muscleGroup: MuscleGroup? = null, val equipment: Equipment? = null, val exercises: List<Exercise> = emptyList())
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class ExercisesViewModel @Inject constructor(
-    private val repository: ExerciseRepository,
-) : ViewModel() {
+class ExercisesViewModel @Inject constructor(private val repository: ExerciseRepository) : ViewModel() {
     private val query = MutableStateFlow("")
     private val muscleGroup = MutableStateFlow<MuscleGroup?>(null)
     private val equipment = MutableStateFlow<Equipment?>(null)
@@ -73,18 +65,21 @@ class ExercisesViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExercisesUiState())
 
-    fun onQueryChange(value: String) { query.value = value }
-    fun onMuscleGroupChange(value: MuscleGroup?) { muscleGroup.value = value }
-    fun onEquipmentChange(value: Equipment?) { equipment.value = value }
+    fun onQueryChange(value: String) {
+        query.value = value
+    }
+
+    fun onMuscleGroupChange(value: MuscleGroup?) {
+        muscleGroup.value = value
+    }
+
+    fun onEquipmentChange(value: Equipment?) {
+        equipment.value = value
+    }
 }
 
 @Composable
-fun ExercisesRoute(
-    contentPadding: PaddingValues,
-    onAdd: () -> Unit,
-    onEdit: (Long) -> Unit,
-    viewModel: ExercisesViewModel = hiltViewModel(),
-) {
+fun ExercisesRoute(contentPadding: PaddingValues, onAdd: () -> Unit, onEdit: (Long) -> Unit, viewModel: ExercisesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ExercisesScreen(state, contentPadding, onAdd, onEdit, viewModel::onQueryChange, viewModel::onMuscleGroupChange, viewModel::onEquipmentChange)
 }
@@ -97,7 +92,7 @@ fun ExercisesScreen(
     onEdit: (Long) -> Unit,
     onQueryChange: (String) -> Unit,
     onMuscleGroupChange: (MuscleGroup?) -> Unit,
-    onEquipmentChange: (Equipment?) -> Unit,
+    onEquipmentChange: (Equipment?) -> Unit
 ) {
     Scaffold(
         modifier = Modifier.padding(contentPadding),
@@ -105,12 +100,14 @@ fun ExercisesScreen(
             FloatingActionButton(onClick = onAdd) {
                 Icon(Icons.Default.Add, contentDescription = "Добавить")
             }
-        },
+        }
     ) { inner ->
         LazyColumn(
-            Modifier.fillMaxSize().padding(inner),
+            Modifier
+                .fillMaxSize()
+                .padding(inner),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item { GymDiaryTopBar("Упражнения") }
             item {
@@ -119,7 +116,7 @@ fun ExercisesScreen(
                     onValueChange = onQueryChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Поиск") },
-                    singleLine = true,
+                    singleLine = true
                 )
             }
             item {
@@ -141,14 +138,7 @@ fun ExercisesScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun <T> EnumDropdown(
-    label: String,
-    selected: T?,
-    values: List<T>,
-    title: (T) -> String,
-    onSelected: (T?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun <T> EnumDropdown(label: String, selected: T?, values: List<T>, title: (T) -> String, onSelected: (T?) -> Unit, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
         OutlinedTextField(
@@ -157,12 +147,20 @@ fun <T> EnumDropdown(
             readOnly = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true).fillMaxWidth(),
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .fillMaxWidth()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("Все") }, onClick = { onSelected(null); expanded = false })
+            DropdownMenuItem(text = { Text("Все") }, onClick = {
+                onSelected(null)
+                expanded = false
+            })
             values.forEach { value ->
-                DropdownMenuItem(text = { Text(title(value)) }, onClick = { onSelected(value); expanded = false })
+                DropdownMenuItem(text = { Text(title(value)) }, onClick = {
+                    onSelected(value)
+                    expanded = false
+                })
             }
         }
     }

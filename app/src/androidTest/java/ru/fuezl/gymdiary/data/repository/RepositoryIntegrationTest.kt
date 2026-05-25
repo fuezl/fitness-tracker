@@ -307,15 +307,15 @@ class RepositoryIntegrationTest {
                 title = "Тест $startedAt",
                 startedAt = startedAt,
                 finishedAt = startedAt + 1,
-                durationSeconds = 1,
-            ),
+                durationSeconds = 1
+            )
         )
         val workoutExerciseId = workoutDao.insertWorkoutExercise(
             ru.fuezl.gymdiary.core.database.WorkoutExerciseEntity(
                 workoutSessionId = sessionId,
                 exerciseId = exerciseId,
-                orderIndex = 0,
-            ),
+                orderIndex = 0
+            )
         )
         workoutDao.insertSet(
             ru.fuezl.gymdiary.core.database.WorkoutSetEntity(
@@ -323,8 +323,8 @@ class RepositoryIntegrationTest {
                 setNumber = 1,
                 weightKg = weight,
                 reps = reps,
-                isCompleted = true,
-            ),
+                isCompleted = true
+            )
         )
     }
 }

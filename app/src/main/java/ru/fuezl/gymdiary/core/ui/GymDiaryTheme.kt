@@ -15,20 +15,17 @@ import ru.fuezl.gymdiary.core.model.ThemeMode
 private val LightColors = lightColorScheme(
     primary = Color(0xFF2E7D32),
     secondary = Color(0xFF006A6A),
-    tertiary = Color(0xFF8A5100),
+    tertiary = Color(0xFF8A5100)
 )
 
 private val DarkColors = darkColorScheme(
     primary = Color(0xFF7BD77F),
     secondary = Color(0xFF55D7D5),
-    tertiary = Color(0xFFFFB95C),
+    tertiary = Color(0xFFFFB95C)
 )
 
 @Composable
-fun GymDiaryTheme(
-    themeMode: ThemeMode,
-    content: @Composable () -> Unit,
-) {
+fun GymDiaryTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
     val dark = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false

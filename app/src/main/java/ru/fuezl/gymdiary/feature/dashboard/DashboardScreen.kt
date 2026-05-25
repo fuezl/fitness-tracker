@@ -46,25 +46,22 @@ data class DashboardUiState(
     val lastWorkout: WorkoutSummary? = null,
     val weeklyStats: WeeklyStats = WeeklyStats(),
     val monthlyWorkoutCount: Int = 0,
-    val lastWeights: List<Pair<String, Double>> = emptyList(),
+    val lastWeights: List<Pair<String, Double>> = emptyList()
 )
 
 @HiltViewModel
-class DashboardViewModel @Inject constructor(
-    workoutRepository: WorkoutRepository,
-    progressRepository: ProgressRepository,
-) : ViewModel() {
+class DashboardViewModel @Inject constructor(workoutRepository: WorkoutRepository, progressRepository: ProgressRepository) : ViewModel() {
     val uiState = combine(
         workoutRepository.observeWorkoutHistory(),
         progressRepository.observeWeeklyStats(),
-        progressRepository.observeLastWeights(),
+        progressRepository.observeLastWeights()
     ) { history, weekly, weights ->
         val monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         DashboardUiState(
             lastWorkout = history.firstOrNull(),
             weeklyStats = weekly,
             monthlyWorkoutCount = history.count { it.startedAt >= monthStart },
-            lastWeights = weights,
+            lastWeights = weights
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 }
@@ -77,7 +74,7 @@ fun DashboardRoute(
     onHistory: () -> Unit,
     onProgress: () -> Unit,
     onWorkoutDetails: (Long) -> Unit,
-    viewModel: DashboardViewModel = hiltViewModel(),
+    viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     DashboardScreen(state, contentPadding, onStartWorkout, onExercises, onHistory, onProgress, onWorkoutDetails)
@@ -91,12 +88,14 @@ fun DashboardScreen(
     onExercises: () -> Unit,
     onHistory: () -> Unit,
     onProgress: () -> Unit,
-    onWorkoutDetails: (Long) -> Unit,
+    onWorkoutDetails: (Long) -> Unit
 ) {
     LazyColumn(
-        Modifier.fillMaxSize().padding(contentPadding),
+        Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { GymDiaryTopBar("Дневник тренировок") }
         item {

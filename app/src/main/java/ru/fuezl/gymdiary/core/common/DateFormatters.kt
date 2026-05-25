@@ -20,7 +20,7 @@ fun formatMonth(millis: Long): String = Instant.ofEpochMilli(millis).atZone(zone
 fun formatDuration(seconds: Long): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
-    return if (h > 0) "${h} ч ${m} мин" else "${m} мин"
+    return if (h > 0) "$h ч $m мин" else "$m мин"
 }
 
 fun Double.formatKg(): String = if (this % 1.0 == 0.0) "%.0f кг".format(this) else "%.1f кг".format(this)

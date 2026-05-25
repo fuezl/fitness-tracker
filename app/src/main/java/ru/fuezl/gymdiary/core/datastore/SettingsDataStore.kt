@@ -28,9 +28,7 @@ interface SettingsLocalDataSource {
 }
 
 @Singleton
-class SettingsDataStore @Inject constructor(
-    @param:ApplicationContext private val context: Context,
-) : SettingsLocalDataSource {
+class SettingsDataStore @Inject constructor(@param:ApplicationContext private val context: Context) : SettingsLocalDataSource {
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val defaultRestTimerKey = intPreferencesKey("default_rest_timer_seconds")
     private val restTimerEnabledKey = booleanPreferencesKey("rest_timer_enabled")
@@ -43,7 +41,7 @@ class SettingsDataStore @Inject constructor(
             defaultRestTimerSeconds = preferences[defaultRestTimerKey] ?: 90,
             restTimerEnabled = preferences[restTimerEnabledKey] ?: true,
             hapticsEnabled = preferences[hapticsEnabledKey] ?: true,
-            weightUnit = preferences[weightUnitKey]?.let(WeightUnit::valueOf) ?: WeightUnit.KG,
+            weightUnit = preferences[weightUnitKey]?.let(WeightUnit::valueOf) ?: WeightUnit.KG
         )
     }
 
