@@ -36,6 +36,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,7 +53,6 @@ import ru.fuezl.gymdiary.core.ui.EmptyState
 import ru.fuezl.gymdiary.core.ui.ExerciseCard
 import ru.fuezl.gymdiary.core.ui.GymDiaryTopBar
 import ru.fuezl.gymdiary.data.repository.ExerciseRepository
-import javax.inject.Inject
 
 data class ExercisesUiState(val query: String = "", val muscleGroup: MuscleGroup? = null, val equipment: Equipment? = null, val exercises: List<Exercise> = emptyList())
 

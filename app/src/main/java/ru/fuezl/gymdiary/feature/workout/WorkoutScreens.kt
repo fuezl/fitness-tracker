@@ -56,6 +56,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -64,6 +74,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -92,15 +103,6 @@ import ru.fuezl.gymdiary.data.repository.WorkoutTemplateRepository
 import ru.fuezl.gymdiary.data.repository.WorkoutTemplateSummary
 import ru.fuezl.gymdiary.domain.usecase.SetValidator
 import ru.fuezl.gymdiary.domain.usecase.TrainingCalculators
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
-import javax.inject.Inject
 
 @HiltViewModel
 class StartWorkoutViewModel @Inject constructor(private val repository: WorkoutRepository, private val templateRepository: WorkoutTemplateRepository) : ViewModel() {
@@ -249,10 +251,11 @@ class ActiveWorkoutViewModel @Inject constructor(private val workoutRepository: 
     ViewModel() {
     private val local = MutableStateFlow(ActiveWorkoutUiState())
     private val settings = settingsRepository.observeSettings().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
-    val uiState = combine(workoutRepository.observeActiveWorkout(), workoutRepository.observeExerciseHistoryIndex(), settings, local) { workout,
-                                                                                                                                        history,
-                                                                                                                                        settings,
-                                                                                                                                        localState
+    val uiState = combine(workoutRepository.observeActiveWorkout(), workoutRepository.observeExerciseHistoryIndex(), settings, local) {
+            workout,
+            history,
+            settings,
+            localState
         ->
         localState.copy(
             workout = workout,
@@ -897,14 +900,19 @@ private fun BackfillTimeDialog(
 @Composable
 private fun ExerciseTrainingHints(history: List<ExerciseHistoryEntry>) {
     val last = history.firstOrNull() ?: return
-    val bestSet = last.sets.maxWithOrNull(compareBy<WorkoutSetModel> { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) ?: 0.0 }.thenBy { it.weightKg })
+    val bestSet = remember(last.sets) {
+        last.sets.maxWithOrNull(compareBy<WorkoutSetModel> { TrainingCalculators.estimatedOneRm(it.weightKg, it.reps) ?: 0.0 }.thenBy { it.weightKg })
+    }
+    val warmups = remember(bestSet) {
+        val nextWeight = bestSet?.nextSuggestedWeight() ?: return@remember emptyList()
+        listOf(0.5, 0.7, 0.85).map { ratio -> (nextWeight * ratio).coerceAtLeast(20.0) }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Последняя тренировка: ${last.maxWeight.formatKg()} • объём ${last.volume.formatKg()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         bestSet?.let {
-            val nextWeight = if (it.reps >= 8) it.weightKg + 2.5 else it.weightKg
+            val nextWeight = it.nextSuggestedWeight()
             val nextReps = if (nextWeight > it.weightKg) 6 else (it.reps + 1).coerceAtMost(12)
             Text("План: ${nextWeight.formatKg()} × $nextReps", color = MaterialTheme.colorScheme.primary)
-            val warmups = listOf(0.5, 0.7, 0.85).map { ratio -> (nextWeight * ratio).coerceAtLeast(20.0) }
             Text(
                 "Разминка: ${
                     warmups.joinToString(" • ") { weight ->
@@ -917,8 +925,10 @@ private fun ExerciseTrainingHints(history: List<ExerciseHistoryEntry>) {
     }
 }
 
+private fun WorkoutSetModel.nextSuggestedWeight(): Double = if (reps >= 8) weightKg + 2.5 else weightKg
+
 @HiltViewModel
-@OptIn(FlowPreview::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class AddExerciseToWorkoutViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     exerciseRepository: ExerciseRepository,
@@ -928,12 +938,9 @@ class AddExerciseToWorkoutViewModel @Inject constructor(
     private val workoutId: Long = savedStateHandle["workoutId"] ?: 0L
     private val query = MutableStateFlow("")
     private val muscleGroup = MutableStateFlow<MuscleGroup?>(null)
-    val exercises = combine(exerciseRepository.observeExercises(), query.debounce(150), muscleGroup) { exercises, q, group ->
-        exercises.filter { exercise ->
-            (q.isBlank() || exercise.name.contains(q, ignoreCase = true)) &&
-                (group == null || exercise.muscleGroup == group)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val exercises = combine(query.debounce(150), muscleGroup) { q, group -> q to group }
+        .flatMapLatest { (q, group) -> exerciseRepository.searchExercises(q, group, null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val hapticsEnabled = settingsRepository.observeSettings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
     private val eventsChannel = Channel<Unit>(Channel.BUFFERED)

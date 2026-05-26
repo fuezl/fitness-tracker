@@ -40,10 +40,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import ru.fuezl.gymdiary.core.common.formatKg
 import ru.fuezl.gymdiary.core.model.Exercise
 import ru.fuezl.gymdiary.core.model.WorkoutSummary
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,9 +77,12 @@ fun EmptyState(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         shape = MaterialTheme.shapes.medium
     ) {
-        Box(Modifier
-            .fillMaxWidth()
-            .padding(20.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

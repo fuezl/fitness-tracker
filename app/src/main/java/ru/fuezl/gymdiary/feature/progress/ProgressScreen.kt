@@ -30,6 +30,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,7 +54,6 @@ import ru.fuezl.gymdiary.core.ui.StatCard
 import ru.fuezl.gymdiary.data.repository.ExerciseRepository
 import ru.fuezl.gymdiary.data.repository.ProgressRepository
 import ru.fuezl.gymdiary.data.repository.SelectedExerciseProgress
-import javax.inject.Inject
 
 data class ProgressUiState(
     val weeklyStats: WeeklyStats = WeeklyStats(),

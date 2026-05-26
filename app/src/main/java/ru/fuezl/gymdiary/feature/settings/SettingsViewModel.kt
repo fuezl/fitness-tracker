@@ -3,6 +3,7 @@ package ru.fuezl.gymdiary.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -11,7 +12,6 @@ import kotlinx.coroutines.launch
 import ru.fuezl.gymdiary.core.model.ThemeMode
 import ru.fuezl.gymdiary.core.model.UserSettings
 import ru.fuezl.gymdiary.data.repository.SettingsRepository
-import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(private val repository: SettingsRepository) : ViewModel() {

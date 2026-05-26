@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -31,8 +33,6 @@ import ru.fuezl.gymdiary.core.model.MuscleGroup
 import ru.fuezl.gymdiary.core.model.ThemeMode
 import ru.fuezl.gymdiary.core.model.UserSettings
 import ru.fuezl.gymdiary.core.model.WorkoutSetModel
-import java.time.LocalDateTime
-import java.time.ZoneId
 
 @RunWith(AndroidJUnit4::class)
 class RepositoryIntegrationTest {
@@ -189,6 +189,24 @@ class RepositoryIntegrationTest {
         repository.addSet(workoutExerciseId)
 
         assertEquals(listOf(2, 3), workoutDao.getSets(workoutExerciseId).map { it.setNumber })
+    }
+
+    @Test
+    fun workoutRepository_dashboardSnapshotCalculatesHomeScreenDataFromSingleHistoryFlow() = runTest {
+        val recentExerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val oldExerciseId = exerciseDao.insert(ExerciseEntity(name = "Тяга", muscleGroup = MuscleGroup.BACK, equipment = Equipment.BARBELL))
+        val repository = DefaultWorkoutRepository(workoutDao, templateDao)
+        val recentStartedAt = LocalDateTime.now().minusDays(1).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val oldStartedAt = LocalDateTime.now().minusDays(40).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        insertFinishedWorkout(exerciseId = oldExerciseId, startedAt = oldStartedAt, weight = 140.0, reps = 3)
+        insertFinishedWorkout(exerciseId = recentExerciseId, startedAt = recentStartedAt, weight = 100.0, reps = 5)
+
+        val snapshot = repository.observeDashboardSnapshot().first()
+
+        assertEquals("Тест $recentStartedAt", snapshot.lastWorkout?.title)
+        assertEquals(1, snapshot.weeklyStats.workouts)
+        assertEquals(1, snapshot.monthlyWorkoutCount)
+        assertEquals(listOf("Жим" to 100.0, "Тяга" to 140.0), snapshot.lastWeights)
     }
 
     @Test

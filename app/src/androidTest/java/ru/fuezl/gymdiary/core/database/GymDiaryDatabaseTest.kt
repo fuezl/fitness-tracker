@@ -96,6 +96,22 @@ class GymDiaryDatabaseTest {
     }
 
     @Test
+    fun aggregateWorkoutQueries_returnCountsAndMaxSetNumberWithoutLoadingRows() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Присед", muscleGroup = MuscleGroup.LEGS, equipment = Equipment.BARBELL))
+        val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Ноги", startedAt = 1))
+        val workoutExerciseId = workoutDao.insertWorkoutExercise(WorkoutExerciseEntity(workoutSessionId = sessionId, exerciseId = exerciseId, orderIndex = 0))
+
+        assertEquals(1, workoutDao.getWorkoutExerciseCount(sessionId))
+        assertEquals(0, workoutDao.getMaxSetNumber(workoutExerciseId))
+
+        val firstSetId = workoutDao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = 1, weightKg = 80.0, reps = 8))
+        workoutDao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = 3, weightKg = 100.0, reps = 5))
+        workoutDao.deleteSet(firstSetId)
+
+        assertEquals(3, workoutDao.getMaxSetNumber(workoutExerciseId))
+    }
+
+    @Test
     fun deleteWorkout_cascadesWorkoutExercisesAndSets() = runTest {
         val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Тяга", muscleGroup = MuscleGroup.BACK, equipment = Equipment.BARBELL))
         val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Спина", startedAt = 1, finishedAt = 2, durationSeconds = 1))

@@ -8,6 +8,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 import ru.fuezl.gymdiary.core.database.GymDiaryDatabase
 import ru.fuezl.gymdiary.core.datastore.SettingsDataStore
 import ru.fuezl.gymdiary.core.datastore.SettingsLocalDataSource
@@ -21,7 +22,6 @@ import ru.fuezl.gymdiary.data.repository.ProgressRepository
 import ru.fuezl.gymdiary.data.repository.SettingsRepository
 import ru.fuezl.gymdiary.data.repository.WorkoutRepository
 import ru.fuezl.gymdiary.data.repository.WorkoutTemplateRepository
-import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)

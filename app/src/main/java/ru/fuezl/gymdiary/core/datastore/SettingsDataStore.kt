@@ -9,13 +9,13 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.fuezl.gymdiary.core.model.ThemeMode
 import ru.fuezl.gymdiary.core.model.UserSettings
 import ru.fuezl.gymdiary.core.model.WeightUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore("user_settings")
 

@@ -28,6 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -38,7 +39,6 @@ import ru.fuezl.gymdiary.core.model.MuscleGroup
 import ru.fuezl.gymdiary.core.ui.GymDiaryTopBar
 import ru.fuezl.gymdiary.data.repository.ExerciseRepository
 import ru.fuezl.gymdiary.domain.usecase.ExerciseValidator
-import javax.inject.Inject
 
 data class ExerciseEditUiState(
     val id: Long = 0,

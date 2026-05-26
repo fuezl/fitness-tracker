@@ -104,6 +104,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_exercises WHERE workoutSessionId = :sessionId ORDER BY orderIndex ASC")
     suspend fun getWorkoutExercises(sessionId: Long): List<WorkoutExerciseEntity>
 
+    @Query("SELECT COUNT(*) FROM workout_exercises WHERE workoutSessionId = :sessionId")
+    suspend fun getWorkoutExerciseCount(sessionId: Long): Int
+
     @Insert
     suspend fun insertWorkoutExercise(entity: WorkoutExerciseEntity): Long
 
@@ -115,6 +118,9 @@ interface WorkoutDao {
 
     @Query("SELECT * FROM workout_sets WHERE workoutExerciseId = :workoutExerciseId ORDER BY setNumber ASC")
     suspend fun getSets(workoutExerciseId: Long): List<WorkoutSetEntity>
+
+    @Query("SELECT COALESCE(MAX(setNumber), 0) FROM workout_sets WHERE workoutExerciseId = :workoutExerciseId")
+    suspend fun getMaxSetNumber(workoutExerciseId: Long): Int
 
     @Query("SELECT * FROM workout_sets WHERE id = :id")
     suspend fun getSet(id: Long): WorkoutSetEntity?
@@ -203,6 +209,9 @@ interface BodyWeightDao {
 interface ExerciseGoalDao {
     @Query("SELECT * FROM exercise_goals WHERE exerciseId = :exerciseId LIMIT 1")
     fun observeGoal(exerciseId: Long): Flow<ExerciseGoalEntity?>
+
+    @Query("SELECT * FROM exercise_goals WHERE exerciseId = :exerciseId LIMIT 1")
+    suspend fun getGoal(exerciseId: Long): ExerciseGoalEntity?
 
     @Query("SELECT * FROM exercise_goals")
     suspend fun getAll(): List<ExerciseGoalEntity>

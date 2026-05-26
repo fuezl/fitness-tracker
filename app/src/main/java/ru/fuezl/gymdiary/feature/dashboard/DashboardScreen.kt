@@ -30,8 +30,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.fuezl.gymdiary.core.common.formatDate
 import ru.fuezl.gymdiary.core.common.formatKg
@@ -43,11 +44,7 @@ import ru.fuezl.gymdiary.core.ui.MetricChip
 import ru.fuezl.gymdiary.core.ui.SectionTitle
 import ru.fuezl.gymdiary.core.ui.StatCard
 import ru.fuezl.gymdiary.core.ui.WorkoutCard
-import ru.fuezl.gymdiary.data.repository.ProgressRepository
 import ru.fuezl.gymdiary.data.repository.WorkoutRepository
-import java.time.LocalDate
-import java.time.ZoneId
-import javax.inject.Inject
 
 data class DashboardUiState(
     val lastWorkout: WorkoutSummary? = null,
@@ -57,20 +54,16 @@ data class DashboardUiState(
 )
 
 @HiltViewModel
-class DashboardViewModel @Inject constructor(workoutRepository: WorkoutRepository, progressRepository: ProgressRepository) : ViewModel() {
-    val uiState = combine(
-        workoutRepository.observeWorkoutHistory(),
-        progressRepository.observeWeeklyStats(),
-        progressRepository.observeLastWeights()
-    ) { history, weekly, weights ->
-        val monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        DashboardUiState(
-            lastWorkout = history.firstOrNull(),
-            weeklyStats = weekly,
-            monthlyWorkoutCount = history.count { it.startedAt >= monthStart },
-            lastWeights = weights
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
+class DashboardViewModel @Inject constructor(workoutRepository: WorkoutRepository) : ViewModel() {
+    val uiState = workoutRepository.observeDashboardSnapshot()
+        .map { snapshot ->
+            DashboardUiState(
+                lastWorkout = snapshot.lastWorkout,
+                weeklyStats = snapshot.weeklyStats,
+                monthlyWorkoutCount = snapshot.monthlyWorkoutCount,
+                lastWeights = snapshot.lastWeights
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 }
 
 @Composable

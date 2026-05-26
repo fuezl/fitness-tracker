@@ -1,10 +1,16 @@
 package ru.fuezl.gymdiary.data.repository
 
 import androidx.room.withTransaction
+import java.time.LocalDate
+import java.time.ZoneId
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -41,10 +47,6 @@ import ru.fuezl.gymdiary.core.model.WorkoutDetails
 import ru.fuezl.gymdiary.core.model.WorkoutSetModel
 import ru.fuezl.gymdiary.core.model.WorkoutSummary
 import ru.fuezl.gymdiary.domain.usecase.TrainingCalculators
-import java.time.LocalDate
-import java.time.ZoneId
-import javax.inject.Inject
-import javax.inject.Singleton
 
 interface ExerciseRepository {
     fun observeExercises(): Flow<List<Exercise>>
@@ -60,11 +62,13 @@ interface ExerciseRepository {
 class DefaultExerciseRepository @Inject constructor(private val dao: ExerciseDao) : ExerciseRepository {
     override fun observeExercises(): Flow<List<Exercise>> = dao.observeExercises()
         .map { it.map(ExerciseEntity::asModel) }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun searchExercises(query: String, muscleGroup: MuscleGroup?, equipment: Equipment?): Flow<List<Exercise>> =
         dao.searchExercises(query.trim(), muscleGroup?.name, equipment?.name)
             .map { it.map(ExerciseEntity::asModel) }
+            .flowOn(Dispatchers.Default)
             .distinctUntilChanged()
 
     override suspend fun getExercise(id: Long): Exercise? = dao.getExercise(id)?.asModel()
@@ -111,6 +115,7 @@ class DefaultExerciseRepository @Inject constructor(private val dao: ExerciseDao
 interface WorkoutRepository {
     fun observeActiveWorkout(): Flow<WorkoutDetails?>
     fun observeWorkoutHistory(): Flow<List<WorkoutSummary>>
+    fun observeDashboardSnapshot(): Flow<DashboardSnapshot>
     fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?>
     fun observeExerciseHistoryIndex(): Flow<Map<Long, List<ExerciseHistoryEntry>>>
     suspend fun startWorkout(title: String = "Тренировка"): Long
@@ -127,19 +132,42 @@ interface WorkoutRepository {
     suspend fun repeatWorkout(workoutId: Long): Long
 }
 
+data class DashboardSnapshot(
+    val lastWorkout: WorkoutSummary? = null,
+    val weeklyStats: WeeklyStats = WeeklyStats(),
+    val monthlyWorkoutCount: Int = 0,
+    val lastWeights: List<Pair<String, Double>> = emptyList()
+)
+
 @Singleton
 class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, private val templateDao: WorkoutTemplateDao) : WorkoutRepository {
     override fun observeActiveWorkout(): Flow<WorkoutDetails?> = dao.observeActiveWorkoutDetails()
         .map { it?.asDetails() }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeWorkoutHistory(): Flow<List<WorkoutSummary>> =
         dao.observeFinishedWorkoutDetails()
             .map { workouts -> workouts.map { it.asDetails().summary }.sortedByDescending { it.startedAt } }
+            .flowOn(Dispatchers.Default)
             .distinctUntilChanged()
+
+    override fun observeDashboardSnapshot(): Flow<DashboardSnapshot> = dao.observeFinishedWorkoutDetails()
+        .map { workouts ->
+            val details = workouts.map { it.asDetails() }
+            DashboardSnapshot(
+                lastWorkout = details.maxByOrNull { it.summary.startedAt }?.summary,
+                weeklyStats = calculateWeeklyStats(details),
+                monthlyWorkoutCount = calculateMonthlyWorkoutCount(details),
+                lastWeights = calculateLastWeights(details)
+            )
+        }
+        .flowOn(Dispatchers.Default)
+        .distinctUntilChanged()
 
     override fun observeWorkoutDetails(id: Long): Flow<WorkoutDetails?> = dao.observeWorkoutDetails(id)
         .map { it?.asDetails() }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeExerciseHistoryIndex(): Flow<Map<Long, List<ExerciseHistoryEntry>>> = dao.observeFinishedWorkoutDetails()
@@ -163,6 +191,7 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
                 }
             }.groupBy({ it.first }, { it.second }).mapValues { (_, entries) -> entries.sortedByDescending { it.date } }
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override suspend fun startWorkout(title: String): Long {
@@ -186,12 +215,12 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
     }
 
     override suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long): Long {
-        val order = dao.getWorkoutExercises(workoutId).size
+        val order = dao.getWorkoutExerciseCount(workoutId)
         return dao.insertWorkoutExercise(WorkoutExerciseEntity(workoutSessionId = workoutId, exerciseId = exerciseId, orderIndex = order))
     }
 
     override suspend fun addSet(workoutExerciseId: Long): Long {
-        val next = (dao.getSets(workoutExerciseId).maxOfOrNull { it.setNumber } ?: 0) + 1
+        val next = dao.getMaxSetNumber(workoutExerciseId) + 1
         return dao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = next, weightKg = 0.0, reps = 0))
     }
 
@@ -254,6 +283,30 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
         }
         return newId
     }
+
+    private fun calculateWeeklyStats(details: List<WorkoutDetails>): WeeklyStats {
+        val start = LocalDate.now().minusDays(6).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val recent = details.filter { it.summary.startedAt >= start }
+        return WeeklyStats(recent.size, recent.sumOf { it.summary.setCount }, recent.sumOf { it.summary.totalVolume })
+    }
+
+    private fun calculateMonthlyWorkoutCount(details: List<WorkoutDetails>): Int {
+        val monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        return details.count { it.summary.startedAt >= monthStart }
+    }
+
+    private fun calculateLastWeights(details: List<WorkoutDetails>): List<Pair<String, Double>> =
+        details.sortedByDescending { it.summary.startedAt }
+            .flatMap { workout ->
+                workout.exercises.mapNotNull { exercise ->
+                    exercise.sets
+                        .filter { it.isCompleted && it.weightKg > 0.0 }
+                        .maxByOrNull { it.createdAt }
+                        ?.let { exercise.exerciseName to it.weightKg }
+                }
+            }
+            .distinctBy { it.first }
+            .take(5)
 }
 
 data class WorkoutTemplateSummary(val id: Long, val title: String, val note: String, val exerciseCount: Int)
@@ -278,6 +331,7 @@ class DefaultWorkoutTemplateRepository @Inject constructor(private val workoutDa
                 )
             }
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override suspend fun createTemplateFromWorkout(workoutId: Long, title: String, note: String): Long {
@@ -347,18 +401,21 @@ class DefaultProgressRepository @Inject constructor(private val workoutDao: Work
                 personalRecords = calculatePersonalRecords(details)
             )
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeWeeklyStats(): Flow<WeeklyStats> = workoutDao.observeFinishedWorkoutDetails()
         .map { workouts ->
             calculateWeeklyStats(workouts.map { it.asDetails() })
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observePersonalRecords(): Flow<List<PersonalRecord>> = workoutDao.observeFinishedWorkoutDetails()
         .map { workouts ->
             calculatePersonalRecords(workouts.map { it.asDetails() })
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeSelectedExerciseProgress(exerciseId: Long): Flow<SelectedExerciseProgress> =
@@ -373,12 +430,15 @@ class DefaultProgressRepository @Inject constructor(private val workoutDao: Work
                     goal = goal?.let { ExerciseGoal(it.id, it.exerciseId, it.targetWeightKg, it.targetReps, it.note) }
                 )
             )
-        }.distinctUntilChanged()
+        }
+            .flowOn(Dispatchers.Default)
+            .distinctUntilChanged()
 
     override fun observeExerciseProgress(exerciseId: Long): Flow<List<ExerciseProgressPoint>> = workoutDao.observeFinishedWorkoutDetails()
         .map { workouts ->
             calculateExerciseProgress(workouts.map { it.asDetails() }, exerciseId)
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeExerciseAnalytics(exerciseId: Long): Flow<ExerciseAnalytics> = combine(workoutDao.observeFinishedWorkoutDetails(), goalDao.observeGoal(exerciseId)) { workouts, goal ->
@@ -389,6 +449,7 @@ class DefaultProgressRepository @Inject constructor(private val workoutDao: Work
             goal = goal?.let { ExerciseGoal(it.id, it.exerciseId, it.targetWeightKg, it.targetReps, it.note) }
         )
     }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeLastWeights(): Flow<List<Pair<String, Double>>> = workoutDao.observeFinishedWorkoutDetails()
@@ -399,6 +460,7 @@ class DefaultProgressRepository @Inject constructor(private val workoutDao: Work
                 }
             }.distinctBy { it.first }.take(5)
         }
+        .flowOn(Dispatchers.Default)
         .distinctUntilChanged()
 
     override fun observeBodyWeight(): Flow<List<BodyWeightEntryEntity>> = bodyWeightDao.observeEntries().distinctUntilChanged()
@@ -414,7 +476,7 @@ class DefaultProgressRepository @Inject constructor(private val workoutDao: Work
     override suspend fun saveExerciseGoal(exerciseId: Long, targetWeightKg: Double, targetReps: Int, note: String) {
         if (targetWeightKg <= 0.0 || targetReps <= 0) return
         val now = System.currentTimeMillis()
-        val existing = goalDao.getAll().firstOrNull { it.exerciseId == exerciseId }
+        val existing = goalDao.getGoal(exerciseId)
         goalDao.upsert(
             ExerciseGoalEntity(
                 id = existing?.id ?: 0,

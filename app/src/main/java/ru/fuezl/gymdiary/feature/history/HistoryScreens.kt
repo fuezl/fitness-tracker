@@ -31,6 +31,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -47,7 +48,6 @@ import ru.fuezl.gymdiary.core.ui.EmptyState
 import ru.fuezl.gymdiary.core.ui.GymDiaryTopBar
 import ru.fuezl.gymdiary.core.ui.WorkoutCard
 import ru.fuezl.gymdiary.data.repository.WorkoutRepository
-import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutHistoryViewModel @Inject constructor(repository: WorkoutRepository) : ViewModel() {
@@ -62,6 +62,7 @@ fun WorkoutHistoryRoute(contentPadding: PaddingValues, onOpen: (Long) -> Unit, v
 
 @Composable
 fun WorkoutHistoryScreen(history: List<WorkoutSummary>, contentPadding: PaddingValues, onOpen: (Long) -> Unit) {
+    val groupedHistory = remember(history) { history.groupBy { formatMonth(it.startedAt) } }
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -73,7 +74,7 @@ fun WorkoutHistoryScreen(history: List<WorkoutSummary>, contentPadding: PaddingV
         if (history.isEmpty()) {
             item { EmptyState("Нет сохранённых тренировок") }
         } else {
-            history.groupBy { formatMonth(it.startedAt) }.forEach { (month, workouts) ->
+            groupedHistory.forEach { (month, workouts) ->
                 item { Text(month.replaceFirstChar { it.titlecase() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                 items(workouts, key = { it.id }, contentType = { "workout_summary" }) { workout ->
                     WorkoutCard(workout, "${formatDate(workout.startedAt)} • ${formatDuration(workout.durationSeconds)}", { onOpen(workout.id) })
