@@ -48,6 +48,19 @@ class CalculatorsTest {
     }
 
     @Test
+    fun estimatedOneRm_rejectsNonFiniteWeight() {
+        assertNull(TrainingCalculators.estimatedOneRm(Double.NaN, 5))
+        assertNull(TrainingCalculators.estimatedOneRm(Double.POSITIVE_INFINITY, 5))
+        assertNull(TrainingCalculators.estimatedOneRm(Double.NEGATIVE_INFINITY, 5))
+    }
+
+    @Test
+    fun estimatedOneRm_handlesHighRepsAndFractionalWeight() {
+        assertEquals(25.0, TrainingCalculators.estimatedOneRm(12.5, 30) ?: 0.0, 0.001)
+        assertEquals(100.0, TrainingCalculators.estimatedOneRm(50.0, 30) ?: 0.0, 0.001)
+    }
+
+    @Test
     fun bodyweightReps_countsCompletedZeroWeightSets() {
         val sets = listOf(
             set(weightKg = 0.0, reps = 10, isCompleted = true),
@@ -71,6 +84,17 @@ class CalculatorsTest {
     }
 
     @Test
+    fun bodyweightReps_countsSeveralValidBodyweightSets() {
+        val sets = listOf(
+            set(weightKg = 0.0, reps = 10, isCompleted = true),
+            set(weightKg = 0.0, reps = 12, isCompleted = true),
+            set(weightKg = 0.0, reps = 1, isCompleted = true)
+        )
+
+        assertEquals(23, TrainingCalculators.bodyweightReps(sets))
+    }
+
+    @Test
     fun workoutHistory_sortsByStartedAtDescending() {
         val sorted = listOf(summary(1, 1000), summary(2, 3000), summary(3, 2000)).sortedByDescending { it.startedAt }
 
@@ -83,7 +107,6 @@ class CalculatorsTest {
         setNumber = 1,
         weightKg = weightKg,
         reps = reps,
-        rpe = null,
         isCompleted = isCompleted,
         note = "",
         createdAt = 0

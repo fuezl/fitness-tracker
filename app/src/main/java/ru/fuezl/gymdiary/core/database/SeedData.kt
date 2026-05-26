@@ -4,136 +4,38 @@ import ru.fuezl.gymdiary.core.model.Equipment
 import ru.fuezl.gymdiary.core.model.MuscleGroup
 
 object SeedData {
-    fun exercises(now: Long = System.currentTimeMillis()): List<ExerciseEntity> = listOf(
-        ExerciseEntity(
-            name = "Жим штанги лёжа",
-            muscleGroup = MuscleGroup.CHEST,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Жим гантелей лёжа",
-            muscleGroup = MuscleGroup.CHEST,
-            equipment = Equipment.DUMBBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Отжимания",
-            muscleGroup = MuscleGroup.CHEST,
-            equipment = Equipment.BODYWEIGHT,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Подтягивания",
-            muscleGroup = MuscleGroup.BACK,
-            equipment = Equipment.BODYWEIGHT,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Тяга верхнего блока",
-            muscleGroup = MuscleGroup.BACK,
-            equipment = Equipment.CABLE,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Тяга штанги в наклоне",
-            muscleGroup = MuscleGroup.BACK,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Приседания со штангой",
-            muscleGroup = MuscleGroup.LEGS,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(name = "Жим ногами", muscleGroup = MuscleGroup.LEGS, equipment = Equipment.MACHINE, isCustom = false, createdAt = now, updatedAt = now),
-        ExerciseEntity(
-            name = "Румынская тяга",
-            muscleGroup = MuscleGroup.LEGS,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Жим штанги стоя",
-            muscleGroup = MuscleGroup.SHOULDERS,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Махи гантелями в стороны",
-            muscleGroup = MuscleGroup.SHOULDERS,
-            equipment = Equipment.DUMBBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Подъем штанги на бицепс",
-            muscleGroup = MuscleGroup.BICEPS,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Подъем гантелей на бицепс",
-            muscleGroup = MuscleGroup.BICEPS,
-            equipment = Equipment.DUMBBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Французский жим",
-            muscleGroup = MuscleGroup.TRICEPS,
-            equipment = Equipment.BARBELL,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Разгибание рук на блоке",
-            muscleGroup = MuscleGroup.TRICEPS,
-            equipment = Equipment.CABLE,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(
-            name = "Скручивания",
-            muscleGroup = MuscleGroup.ABS,
-            equipment = Equipment.BODYWEIGHT,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        ),
-        ExerciseEntity(name = "Планка", muscleGroup = MuscleGroup.ABS, equipment = Equipment.BODYWEIGHT, isCustom = false, createdAt = now, updatedAt = now),
-        ExerciseEntity(
-            name = "Беговая дорожка",
-            muscleGroup = MuscleGroup.CARDIO,
-            equipment = Equipment.CARDIO_MACHINE,
-            isCustom = false,
-            createdAt = now,
-            updatedAt = now
-        )
+    fun exercises(now: Long = System.currentTimeMillis()): List<ExerciseEntity> =
+        defaultExercises.map { spec ->
+            ExerciseEntity(
+                name = spec.name,
+                muscleGroup = spec.muscleGroup,
+                equipment = spec.equipment,
+                isCustom = false,
+                createdAt = now,
+                updatedAt = now
+            )
+        }
+
+    private val defaultExercises = listOf(
+        SeedExercise("Жим штанги лёжа", MuscleGroup.CHEST, Equipment.BARBELL),
+        SeedExercise("Жим гантелей лёжа", MuscleGroup.CHEST, Equipment.DUMBBELL),
+        SeedExercise("Отжимания", MuscleGroup.CHEST, Equipment.BODYWEIGHT),
+        SeedExercise("Подтягивания", MuscleGroup.BACK, Equipment.BODYWEIGHT),
+        SeedExercise("Тяга верхнего блока", MuscleGroup.BACK, Equipment.CABLE),
+        SeedExercise("Тяга штанги в наклоне", MuscleGroup.BACK, Equipment.BARBELL),
+        SeedExercise("Приседания со штангой", MuscleGroup.LEGS, Equipment.BARBELL),
+        SeedExercise("Жим ногами", MuscleGroup.LEGS, Equipment.MACHINE),
+        SeedExercise("Румынская тяга", MuscleGroup.LEGS, Equipment.BARBELL),
+        SeedExercise("Жим штанги стоя", MuscleGroup.SHOULDERS, Equipment.BARBELL),
+        SeedExercise("Махи гантелями в стороны", MuscleGroup.SHOULDERS, Equipment.DUMBBELL),
+        SeedExercise("Подъем штанги на бицепс", MuscleGroup.BICEPS, Equipment.BARBELL),
+        SeedExercise("Подъем гантелей на бицепс", MuscleGroup.BICEPS, Equipment.DUMBBELL),
+        SeedExercise("Французский жим", MuscleGroup.TRICEPS, Equipment.BARBELL),
+        SeedExercise("Разгибание рук на блоке", MuscleGroup.TRICEPS, Equipment.CABLE),
+        SeedExercise("Скручивания", MuscleGroup.ABS, Equipment.BODYWEIGHT),
+        SeedExercise("Планка", MuscleGroup.ABS, Equipment.BODYWEIGHT),
+        SeedExercise("Беговая дорожка", MuscleGroup.CARDIO, Equipment.CARDIO_MACHINE)
     )
 }
+
+private data class SeedExercise(val name: String, val muscleGroup: MuscleGroup, val equipment: Equipment)

@@ -75,7 +75,7 @@ fun WorkoutHistoryScreen(history: List<WorkoutSummary>, contentPadding: PaddingV
         } else {
             history.groupBy { formatMonth(it.startedAt) }.forEach { (month, workouts) ->
                 item { Text(month.replaceFirstChar { it.titlecase() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-                items(workouts, key = { it.id }) { workout ->
+                items(workouts, key = { it.id }, contentType = { "workout_summary" }) { workout ->
                     WorkoutCard(workout, "${formatDate(workout.startedAt)} • ${formatDuration(workout.durationSeconds)}", { onOpen(workout.id) })
                 }
             }
@@ -134,12 +134,12 @@ fun WorkoutDetailsScreen(details: WorkoutDetails?, onBack: () -> Unit, onRepeat:
                     }
                 }
             }
-            items(details.exercises, key = { it.workoutExerciseId }) { exercise ->
+            items(details.exercises, key = { it.workoutExerciseId }, contentType = { "workout_exercise" }) { exercise ->
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(exercise.exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         exercise.sets.forEach { set ->
-                            Text("${set.setNumber}. ${set.weightKg.formatKg()} × ${set.reps}${set.rpe?.let { " • RPE $it" } ?: ""}")
+                            Text("${set.setNumber}. ${set.weightKg.formatKg()} × ${set.reps}")
                         }
                     }
                 }

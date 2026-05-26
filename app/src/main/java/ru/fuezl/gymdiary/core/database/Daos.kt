@@ -55,6 +55,10 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE finishedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
     fun observeActiveWorkout(): Flow<WorkoutSessionEntity?>
 
+    @Transaction
+    @Query("SELECT * FROM workout_sessions WHERE finishedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    fun observeActiveWorkoutDetails(): Flow<WorkoutSessionWithDetails?>
+
     @Query("SELECT * FROM workout_sessions WHERE finishedAt IS NOT NULL ORDER BY startedAt DESC")
     fun observeWorkoutHistory(): Flow<List<WorkoutSessionEntity>>
 
@@ -133,6 +137,20 @@ interface WorkoutTemplateDao {
     @Query("SELECT * FROM workout_templates ORDER BY title ASC")
     fun observeTemplates(): Flow<List<WorkoutTemplateEntity>>
 
+    @Query(
+        """
+        SELECT workout_templates.id AS id,
+               workout_templates.title AS title,
+               workout_templates.note AS note,
+               COUNT(workout_template_exercises.id) AS exerciseCount
+        FROM workout_templates
+        LEFT JOIN workout_template_exercises ON workout_template_exercises.templateId = workout_templates.id
+        GROUP BY workout_templates.id
+        ORDER BY workout_templates.title ASC
+        """
+    )
+    fun observeTemplateSummaries(): Flow<List<WorkoutTemplateSummaryProjection>>
+
     @Query("SELECT * FROM workout_templates WHERE id = :id")
     suspend fun getTemplate(id: Long): WorkoutTemplateEntity?
 
@@ -160,6 +178,8 @@ interface WorkoutTemplateDao {
     @Query("DELETE FROM workout_templates WHERE id = :id")
     suspend fun deleteTemplate(id: Long)
 }
+
+data class WorkoutTemplateSummaryProjection(val id: Long, val title: String, val note: String, val exerciseCount: Int)
 
 @Dao
 interface BodyWeightDao {

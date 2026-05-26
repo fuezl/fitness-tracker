@@ -10,6 +10,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +22,7 @@ class GymDiaryDatabaseTest {
     private lateinit var database: GymDiaryDatabase
     private lateinit var exerciseDao: ExerciseDao
     private lateinit var workoutDao: WorkoutDao
+    private lateinit var templateDao: WorkoutTemplateDao
     private lateinit var goalDao: ExerciseGoalDao
 
     @Before
@@ -31,6 +33,7 @@ class GymDiaryDatabaseTest {
             .build()
         exerciseDao = database.exerciseDao()
         workoutDao = database.workoutDao()
+        templateDao = database.workoutTemplateDao()
         goalDao = database.exerciseGoalDao()
     }
 
@@ -50,6 +53,21 @@ class GymDiaryDatabaseTest {
     }
 
     @Test
+    fun searchExercises_filtersByQueryMuscleEquipmentAndSortsCaseInsensitive() = runTest {
+        exerciseDao.insert(ExerciseEntity(name = "жим гантелей", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.DUMBBELL))
+        exerciseDao.insert(ExerciseEntity(name = "Жим штанги", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        exerciseDao.insert(ExerciseEntity(name = "Тяга блока", muscleGroup = MuscleGroup.BACK, equipment = Equipment.MACHINE))
+
+        val chestPresses = exerciseDao.searchExercises("ЖИМ", MuscleGroup.CHEST.name, null).first()
+        val barbellPresses = exerciseDao.searchExercises("жим", MuscleGroup.CHEST.name, Equipment.BARBELL.name).first()
+        val empty = exerciseDao.searchExercises("жим", MuscleGroup.BACK.name, null).first()
+
+        assertEquals(listOf("жим гантелей", "Жим штанги"), chestPresses.map { it.name })
+        assertEquals(listOf("Жим штанги"), barbellPresses.map { it.name })
+        assertEquals(emptyList<ExerciseEntity>(), empty)
+    }
+
+    @Test
     fun insertWorkoutWithExerciseAndSet_returnsDetails() = runTest {
         val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Присед", muscleGroup = MuscleGroup.LEGS, equipment = Equipment.BARBELL))
         val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Ноги", startedAt = 1, finishedAt = 2, durationSeconds = 1))
@@ -65,6 +83,19 @@ class GymDiaryDatabaseTest {
     }
 
     @Test
+    fun getSets_returnsBySetNumberEvenWhenInsertedOutOfOrder() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Присед", muscleGroup = MuscleGroup.LEGS, equipment = Equipment.BARBELL))
+        val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Ноги", startedAt = 1))
+        val workoutExerciseId = workoutDao.insertWorkoutExercise(WorkoutExerciseEntity(workoutSessionId = sessionId, exerciseId = exerciseId, orderIndex = 0))
+        workoutDao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = 2, weightKg = 90.0, reps = 5))
+        workoutDao.insertSet(WorkoutSetEntity(workoutExerciseId = workoutExerciseId, setNumber = 1, weightKg = 80.0, reps = 8))
+
+        val sets = workoutDao.getSets(workoutExerciseId)
+
+        assertEquals(listOf(1, 2), sets.map { it.setNumber })
+    }
+
+    @Test
     fun deleteWorkout_cascadesWorkoutExercisesAndSets() = runTest {
         val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Тяга", muscleGroup = MuscleGroup.BACK, equipment = Equipment.BARBELL))
         val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Спина", startedAt = 1, finishedAt = 2, durationSeconds = 1))
@@ -76,6 +107,18 @@ class GymDiaryDatabaseTest {
         assertEquals(null, workoutDao.getWorkoutDetails(sessionId))
         assertEquals(emptyList<WorkoutExerciseEntity>(), workoutDao.getAllWorkoutExercises())
         assertEquals(emptyList<WorkoutSetEntity>(), workoutDao.getAllSets())
+    }
+
+    @Test
+    fun deleteExercise_restrictsWhenExerciseIsUsedByWorkout() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val sessionId = workoutDao.insertSession(WorkoutSessionEntity(title = "Грудь", startedAt = 1))
+        workoutDao.insertWorkoutExercise(WorkoutExerciseEntity(workoutSessionId = sessionId, exerciseId = exerciseId, orderIndex = 0))
+
+        val result = runCatching { exerciseDao.delete(exerciseDao.getExercise(exerciseId) ?: error("exercise not found")) }
+
+        assertTrue(result.isFailure)
+        assertNotNull(exerciseDao.getExercise(exerciseId))
     }
 
     @Test
@@ -98,6 +141,22 @@ class GymDiaryDatabaseTest {
         assertEquals(4, session?.energyLevel)
         assertEquals(3, session?.sleepQuality)
         assertEquals("нет", session?.painNote)
+    }
+
+    @Test
+    fun templateSummaries_returnCountsWithoutPerTemplateQueries() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val secondExerciseId = exerciseDao.insert(ExerciseEntity(name = "Тяга", muscleGroup = MuscleGroup.BACK, equipment = Equipment.BARBELL))
+        val secondTemplateId = templateDao.insertTemplate(WorkoutTemplateEntity(title = "Б шаблон", note = "2"))
+        val firstTemplateId = templateDao.insertTemplate(WorkoutTemplateEntity(title = "А шаблон", note = "1"))
+        templateDao.insertTemplateExercise(WorkoutTemplateExerciseEntity(templateId = secondTemplateId, exerciseId = exerciseId, orderIndex = 0))
+        templateDao.insertTemplateExercise(WorkoutTemplateExerciseEntity(templateId = secondTemplateId, exerciseId = secondExerciseId, orderIndex = 1))
+
+        val summaries = templateDao.observeTemplateSummaries().first()
+
+        assertEquals(listOf("А шаблон", "Б шаблон"), summaries.map { it.title })
+        assertEquals(0, summaries.first { it.id == firstTemplateId }.exerciseCount)
+        assertEquals(2, summaries.first { it.id == secondTemplateId }.exerciseCount)
     }
 
     @Test

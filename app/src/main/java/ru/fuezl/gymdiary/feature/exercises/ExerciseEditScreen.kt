@@ -153,9 +153,12 @@ fun ExerciseEditScreen(
             EnumDropdown("Группа мышц", state.muscleGroup, MuscleGroup.entries, { it.title }, onMuscleGroupChange, Modifier.fillMaxWidth())
             EnumDropdown("Оборудование", state.equipment, Equipment.entries, { it.title }, onEquipmentChange, Modifier.fillMaxWidth())
             OutlinedTextField(value = state.note, onValueChange = onNoteChange, label = { Text("Комментарий") }, modifier = Modifier.fillMaxWidth())
-            Button(onClick = onSave, modifier = Modifier
-                .fillMaxWidth()
-                .testTag("save_exercise")) { Text("Сохранить") }
+            Button(
+                onClick = onSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("save_exercise")
+            ) { Text("Сохранить") }
             if (state.id > 0 && state.isCustom) {
                 OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Удалить упражнение") }
             }

@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -58,6 +59,16 @@ ksp {
 ktlint {
     android.set(true)
     ignoreFailures.set(false)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    ignoreFailures = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+}
+
+tasks.named("check") {
+    dependsOn("detekt")
 }
 
 dependencies {

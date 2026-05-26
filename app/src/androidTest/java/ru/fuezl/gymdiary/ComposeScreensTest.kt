@@ -1,8 +1,11 @@
 package ru.fuezl.gymdiary
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +43,7 @@ class ComposeScreensTest {
         }
 
         composeRule.onNodeWithText("Начать тренировку").assertIsDisplayed()
+        composeRule.onNodeWithText("Начать тренировку").assertIsDisplayed()
     }
 
     @Test
@@ -57,6 +61,23 @@ class ComposeScreensTest {
         }
 
         composeRule.onNodeWithText("Жим штанги лёжа").assertIsDisplayed()
+    }
+
+    @Test
+    fun exercisesScreen_displaysEmptyStateWhenListIsEmpty() {
+        composeRule.setContent {
+            ExercisesScreen(
+                state = ExercisesUiState(exercises = emptyList()),
+                contentPadding = PaddingValues(),
+                onAdd = {},
+                onEdit = {},
+                onQueryChange = {},
+                onMuscleGroupChange = {},
+                onEquipmentChange = {}
+            )
+        }
+
+        composeRule.onNodeWithText("Нет упражнений").assertIsDisplayed()
     }
 
     @Test
@@ -88,10 +109,10 @@ class ComposeScreensTest {
                 contentPadding = PaddingValues(),
                 onAddExercise = {},
                 onAddSet = {},
-                onUpdateSet = { _, _, _, _, _ -> },
+                onUpdateSet = { _, _, _, _ -> },
                 onCompleteSet = { _, _ -> },
                 onDeleteSet = {},
-                onUpdateWorkoutNote = { _, _, _, _ -> },
+                onUpdateWorkoutNote = { _, _ -> },
                 onUpdateExerciseNote = { _, _ -> },
                 onShowFinish = {},
                 onHideFinish = {},
@@ -105,8 +126,94 @@ class ComposeScreensTest {
 
         composeRule.onNodeWithText("Добавить подход").assertIsDisplayed()
         composeRule.onNodeWithText("+2.5").assertIsDisplayed()
+        composeRule.onNodeWithText("Время").assertIsDisplayed()
+        composeRule.onNodeWithText("Вес").assertIsDisplayed()
+        composeRule.onNodeWithText("Повт.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Удалить подход").assertIsDisplayed()
         composeRule.onNodeWithText("Заметка к упражнению").assertIsDisplayed()
-        composeRule.onNodeWithText("Энергия 1-5").assertIsDisplayed()
+    }
+
+    @Test
+    fun activeWorkout_displaysEmptyStateWhenNoWorkout() {
+        composeRule.setContent {
+            ActiveWorkoutScreen(
+                state = ActiveWorkoutUiState(workout = null),
+                contentPadding = PaddingValues(),
+                onAddExercise = {},
+                onAddSet = {},
+                onUpdateSet = { _, _, _, _ -> },
+                onCompleteSet = { _, _ -> },
+                onDeleteSet = {},
+                onUpdateWorkoutNote = { _, _ -> },
+                onUpdateExerciseNote = { _, _ -> },
+                onShowFinish = {},
+                onHideFinish = {},
+                onFinish = {},
+                onAddRest = {},
+                onSkipRest = {},
+                onPauseRest = {},
+                onSaveTemplate = {}
+            )
+        }
+
+        composeRule.onNodeWithText("Активной тренировки нет").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Добавить упражнение").assertCountEquals(0)
+    }
+
+    @Test
+    fun activeWorkout_displaysFinishConfirmationForEmptyWorkout() {
+        composeRule.setContent {
+            ActiveWorkoutScreen(
+                state = ActiveWorkoutUiState(workout = sampleWorkout(exercises = emptyList()), isFinishDialogVisible = true),
+                contentPadding = PaddingValues(),
+                onAddExercise = {},
+                onAddSet = {},
+                onUpdateSet = { _, _, _, _ -> },
+                onCompleteSet = { _, _ -> },
+                onDeleteSet = {},
+                onUpdateWorkoutNote = { _, _ -> },
+                onUpdateExerciseNote = { _, _ -> },
+                onShowFinish = {},
+                onHideFinish = {},
+                onFinish = {},
+                onAddRest = {},
+                onSkipRest = {},
+                onPauseRest = {},
+                onSaveTemplate = {}
+            )
+        }
+
+        composeRule.onNodeWithText("Завершить тренировку?").assertIsDisplayed()
+        composeRule.onNodeWithText("В тренировке нет упражнений. Завершить без сохранения полезных данных?").assertIsDisplayed()
+    }
+
+    @Test
+    fun activeWorkout_displaysTemplateErrorMessage() {
+        composeRule.setContent {
+            ActiveWorkoutScreen(
+                state = ActiveWorkoutUiState(
+                    workout = sampleWorkout(exercises = emptyList()),
+                    errorMessage = "Добавьте упражнения перед сохранением шаблона"
+                ),
+                contentPadding = PaddingValues(),
+                onAddExercise = {},
+                onAddSet = {},
+                onUpdateSet = { _, _, _, _ -> },
+                onCompleteSet = { _, _ -> },
+                onDeleteSet = {},
+                onUpdateWorkoutNote = { _, _ -> },
+                onUpdateExerciseNote = { _, _ -> },
+                onShowFinish = {},
+                onHideFinish = {},
+                onFinish = {},
+                onAddRest = {},
+                onSkipRest = {},
+                onPauseRest = {},
+                onSaveTemplate = {}
+            )
+        }
+
+        composeRule.onNodeWithText("Добавьте упражнения перед сохранением шаблона").assertIsDisplayed()
     }
 
     @Test
@@ -138,29 +245,81 @@ class ComposeScreensTest {
         composeRule.onNodeWithText("Плато").assertIsDisplayed()
     }
 
+    @Test
+    fun progressScreen_displaysEmptyStatesWhenNoExerciseProgressOrRecords() {
+        composeRule.setContent {
+            ProgressScreen(
+                state = ProgressUiState(
+                    exercises = listOf(sampleExercise()),
+                    selectedExerciseId = 1,
+                    selectedExerciseProgress = emptyList(),
+                    selectedExerciseAnalytics = ExerciseAnalytics(history = emptyList()),
+                    personalRecords = emptyList(),
+                    bodyWeight = emptyList()
+                ),
+                contentPadding = PaddingValues(),
+                onSelectExercise = {},
+                onAddBodyWeight = { _, _ -> },
+                onDeleteBodyWeight = {},
+                onSaveGoal = { _, _, _ -> },
+                onDeleteGoal = {}
+            )
+        }
+
+        composeRule.onAllNodesWithText("Нет данных для графика").assertCountEquals(3)
+        composeRule.onNodeWithText("Нет выполненных подходов по выбранному упражнению").assertIsDisplayed()
+        composeRule.onNodeWithText("Нет данных для прогресса").assertIsDisplayed()
+        composeRule.onNodeWithText("Нет записей массы тела").assertIsDisplayed()
+    }
+
+    @Test
+    fun progressScreen_doesNotShowRpeText() {
+        composeRule.setContent {
+            ProgressScreen(
+                state = ProgressUiState(
+                    exercises = listOf(sampleExercise()),
+                    selectedExerciseId = 1,
+                    selectedExerciseProgress = listOf(ExerciseProgressPoint(1, 100.0, 500.0, 116.6)),
+                    selectedExerciseAnalytics = ExerciseAnalytics(
+                        history = listOf(sampleHistoryEntry()),
+                        plateauMessage = "Похоже на плато"
+                    )
+                ),
+                contentPadding = PaddingValues(),
+                onSelectExercise = {},
+                onAddBodyWeight = { _, _ -> },
+                onDeleteBodyWeight = {},
+                onSaveGoal = { _, _, _ -> },
+                onDeleteGoal = {}
+            )
+        }
+
+        composeRule.onAllNodesWithText("RPE", substring = true).assertCountEquals(0)
+    }
+
     private fun sampleExercise(): Exercise = Exercise(1, "Жим штанги лёжа", MuscleGroup.CHEST, Equipment.BARBELL, "", false, 0, 0)
 
-    private fun sampleWorkout(): WorkoutDetails = WorkoutDetails(
+    private fun sampleWorkout(exercises: List<WorkoutExerciseDetails> = listOf(sampleWorkoutExercise())): WorkoutDetails = WorkoutDetails(
         summary = WorkoutSummary(1, "Тренировка", 0, 0, 1, 0, 0.0, 0),
         note = "",
         painNote = "",
-        exercises = listOf(
-            WorkoutExerciseDetails(
-                workoutExerciseId = 1,
-                exerciseId = 1,
-                exerciseName = "Жим штанги лёжа",
-                note = "",
-                sets = listOf(
-                    WorkoutSetModel(1, 1, 1, 100.0, 5, null, false, "", 0)
-                )
-            )
+        exercises = exercises
+    )
+
+    private fun sampleWorkoutExercise(): WorkoutExerciseDetails = WorkoutExerciseDetails(
+        workoutExerciseId = 1,
+        exerciseId = 1,
+        exerciseName = "Жим штанги лёжа",
+        note = "",
+        sets = listOf(
+            WorkoutSetModel(1, 1, 1, 100.0, 5, false, "", 0)
         )
     )
 
     private fun sampleHistoryEntry(): ExerciseHistoryEntry = ExerciseHistoryEntry(
         workoutId = 1,
         date = 1,
-        sets = listOf(WorkoutSetModel(1, 1, 1, 100.0, 5, 8.0, true, "", 0)),
+        sets = listOf(WorkoutSetModel(1, 1, 1, 100.0, 5, true, "", 0)),
         volume = 500.0,
         maxWeight = 100.0,
         bestEstimatedOneRm = 116.6

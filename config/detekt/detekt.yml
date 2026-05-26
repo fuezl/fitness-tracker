@@ -1,0 +1,49 @@
+config:
+  validation: true
+
+complexity:
+  LongMethod:
+    active: true
+    allowedLines: 80
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 12
+    allowedConstructorParameters: 12
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    active: false
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+
+naming:
+  MatchingDeclarationName:
+    active: true
+  FunctionNaming:
+    active: true
+    ignoreAnnotated:
+      - Composable
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][A-Z0-9_]*'
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedPrivateClass:
+    active: true
+    ignoreAnnotated:
+      - Preview
+  UnusedPrivateFunction:
+    active: true
+    ignoreAnnotated:
+      - Preview
+  UnusedPrivateProperty:
+    active: true
+    ignoreAnnotated:
+      - Preview

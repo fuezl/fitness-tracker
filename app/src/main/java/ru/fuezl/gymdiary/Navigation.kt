@@ -22,7 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -42,20 +44,6 @@ import ru.fuezl.gymdiary.feature.settings.SettingsRoute
 import ru.fuezl.gymdiary.feature.workout.ActiveWorkoutRoute
 import ru.fuezl.gymdiary.feature.workout.AddExerciseToWorkoutRoute
 import ru.fuezl.gymdiary.feature.workout.StartWorkoutRoute
-
-object Routes {
-    const val DASHBOARD = "dashboard"
-    const val EXERCISES = "exercises"
-    const val EXERCISE_EDIT = "exerciseEdit/{exerciseId}"
-    const val START_WORKOUT = "startWorkout"
-    const val ACTIVE_WORKOUT = "activeWorkout"
-    const val ADD_EXERCISE = "addExercise/{workoutId}"
-    const val HISTORY = "history"
-    const val DETAILS = "details/{workoutId}"
-    const val PROGRESS = "progress"
-    const val SETTINGS = "settings"
-    const val MORE = "more"
-}
 
 private data class BottomItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -77,100 +65,146 @@ fun GymDiaryApp(navController: NavHostController = rememberNavController()) {
     Scaffold(
         bottomBar = {
             if (showBottom) {
-                NavigationBar {
-                    bottomItems.forEach { item ->
-                        NavigationBarItem(
-                            selected = current?.hierarchy?.any { it.route == item.route } == true ||
-                                (item.route == Routes.MORE && currentRoute in listOf(Routes.PROGRESS, Routes.SETTINGS)),
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) }
-                        )
-                    }
-                }
+                GymDiaryBottomBar(currentRoute, current?.hierarchy?.mapNotNull { it.route }?.toList().orEmpty(), navController::navigateBottomItem)
             }
         }
     ) { padding ->
-        NavHost(navController = navController, startDestination = Routes.DASHBOARD) {
-            composable(Routes.DASHBOARD) {
-                DashboardRoute(
-                    contentPadding = padding,
-                    onStartWorkout = { navController.navigate(Routes.START_WORKOUT) },
-                    onExercises = { navController.navigate(Routes.EXERCISES) },
-                    onHistory = { navController.navigate(Routes.HISTORY) },
-                    onProgress = { navController.navigate(Routes.PROGRESS) },
-                    onWorkoutDetails = { navController.navigate("details/$it") }
-                )
-            }
-            composable(Routes.EXERCISES) {
-                ExercisesRoute(
-                    contentPadding = padding,
-                    onAdd = { navController.navigate("exerciseEdit/0") },
-                    onEdit = { navController.navigate("exerciseEdit/$it") }
-                )
-            }
-            composable(
-                Routes.EXERCISE_EDIT,
-                arguments = listOf(navArgument("exerciseId") { type = NavType.LongType })
-            ) {
-                ExerciseEditRoute(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.START_WORKOUT) {
-                StartWorkoutRoute(
-                    contentPadding = padding,
-                    onActiveWorkout = { navController.navigate(Routes.ACTIVE_WORKOUT) },
-                    onHistory = { navController.navigate(Routes.HISTORY) }
-                )
-            }
-            composable(Routes.ACTIVE_WORKOUT) {
-                ActiveWorkoutRoute(
-                    contentPadding = padding,
-                    onAddExercise = { navController.navigate("addExercise/$it") },
-                    onHistory = {
-                        navController.navigate(Routes.HISTORY) {
-                            popUpTo(Routes.START_WORKOUT) { inclusive = true }
-                        }
-                    }
-                )
-            }
-            composable(
-                Routes.ADD_EXERCISE,
-                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
-            ) {
-                AddExerciseToWorkoutRoute(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.HISTORY) {
-                WorkoutHistoryRoute(contentPadding = padding, onOpen = { navController.navigate("details/$it") })
-            }
-            composable(
-                Routes.DETAILS,
-                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
-            ) {
-                WorkoutDetailsRoute(
-                    onBack = { navController.popBackStack() },
-                    onRepeat = {
-                        navController.navigate(Routes.ACTIVE_WORKOUT) {
-                            popUpTo(Routes.HISTORY)
-                        }
-                    }
-                )
-            }
-            composable(Routes.PROGRESS) { ProgressRoute(contentPadding = padding) }
-            composable(Routes.SETTINGS) { SettingsRoute(contentPadding = padding) }
-            composable(Routes.MORE) {
-                MoreRoute(
-                    contentPadding = padding,
-                    onProgress = { navController.navigate(Routes.PROGRESS) },
-                    onSettings = { navController.navigate(Routes.SETTINGS) }
-                )
-            }
+        GymDiaryNavHost(navController, padding)
+    }
+}
+
+@Composable
+private fun GymDiaryBottomBar(currentRoute: String?, hierarchyRoutes: List<String>, onNavigate: (String) -> Unit) {
+    NavigationBar {
+        bottomItems.forEach { item ->
+            NavigationBarItem(
+                selected = item.route in hierarchyRoutes ||
+                    (item.route == Routes.MORE && currentRoute in listOf(Routes.PROGRESS, Routes.SETTINGS)),
+                onClick = { onNavigate(item.route) },
+                icon = { Icon(item.icon, contentDescription = item.label) },
+                label = {
+                    Text(
+                        text = item.label,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            )
         }
+    }
+}
+
+@Composable
+private fun GymDiaryNavHost(navController: NavHostController, padding: PaddingValues) {
+    NavHost(navController = navController, startDestination = Routes.DASHBOARD) {
+        addDashboardGraph(navController, padding)
+        addExercisesGraph(navController, padding)
+        addWorkoutGraph(navController, padding)
+        addHistoryGraph(navController, padding)
+        composable(Routes.PROGRESS) { ProgressRoute(contentPadding = padding) }
+        composable(Routes.SETTINGS) { SettingsRoute(contentPadding = padding) }
+        composable(Routes.MORE) {
+            MoreRoute(
+                contentPadding = padding,
+                onProgress = { navController.navigate(Routes.PROGRESS) },
+                onSettings = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+    }
+}
+
+private fun androidx.navigation.NavGraphBuilder.addDashboardGraph(navController: NavHostController, padding: PaddingValues) {
+    composable(Routes.DASHBOARD) {
+        DashboardRoute(
+            contentPadding = padding,
+            onStartWorkout = { navController.navigate(Routes.START_WORKOUT) },
+            onExercises = { navController.navigate(Routes.EXERCISES) },
+            onHistory = { navController.navigate(Routes.HISTORY) },
+            onProgress = { navController.navigate(Routes.PROGRESS) },
+            onWorkoutDetails = { navController.navigate("details/$it") }
+        )
+    }
+}
+
+private fun androidx.navigation.NavGraphBuilder.addExercisesGraph(navController: NavHostController, padding: PaddingValues) {
+    composable(Routes.EXERCISES) {
+        ExercisesRoute(
+            contentPadding = padding,
+            onAdd = { navController.navigate("exerciseEdit/0") },
+            onEdit = { navController.navigate("exerciseEdit/$it") }
+        )
+    }
+    composable(
+        Routes.EXERCISE_EDIT,
+        arguments = listOf(navArgument("exerciseId") { type = NavType.LongType })
+    ) {
+        ExerciseEditRoute(onBack = { navController.popBackStack() })
+    }
+}
+
+private fun androidx.navigation.NavGraphBuilder.addWorkoutGraph(navController: NavHostController, padding: PaddingValues) {
+    composable(Routes.START_WORKOUT) {
+        StartWorkoutRoute(
+            contentPadding = padding,
+            onActiveWorkout = { navController.navigate(Routes.ACTIVE_WORKOUT) },
+            onHistory = { navController.navigate(Routes.HISTORY) }
+        )
+    }
+    composable(Routes.ACTIVE_WORKOUT) {
+        ActiveWorkoutRoute(
+            contentPadding = padding,
+            onAddExercise = { navController.navigate("addExercise/$it") },
+            onHistory = { navController.navigateHistoryAfterWorkout() }
+        )
+    }
+    composable(
+        Routes.ADD_EXERCISE,
+        arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
+    ) {
+        AddExerciseToWorkoutRoute(onBack = { navController.popBackStack() })
+    }
+}
+
+private fun androidx.navigation.NavGraphBuilder.addHistoryGraph(navController: NavHostController, padding: PaddingValues) {
+    composable(Routes.HISTORY) {
+        WorkoutHistoryRoute(contentPadding = padding, onOpen = { navController.navigate("details/$it") })
+    }
+    composable(
+        Routes.DETAILS,
+        arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
+    ) {
+        WorkoutDetailsRoute(
+            onBack = { navController.popBackStack() },
+            onRepeat = { navController.navigateRepeatWorkout() }
+        )
+    }
+}
+
+private fun NavHostController.navigateHistoryAfterWorkout() {
+    navigate(Routes.HISTORY) {
+        popUpTo(Routes.START_WORKOUT) { inclusive = true }
+    }
+}
+
+private fun NavHostController.navigateRepeatWorkout() {
+    navigate(Routes.ACTIVE_WORKOUT) {
+        popUpTo(Routes.HISTORY)
+    }
+}
+
+private fun NavHostController.navigateBottomItem(route: String) {
+    if (route == Routes.DASHBOARD) {
+        navigate(route) {
+            popUpTo(graph.findStartDestination().id) { inclusive = true }
+            launchSingleTop = true
+        }
+        return
+    }
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 

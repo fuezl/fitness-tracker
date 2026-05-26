@@ -21,11 +21,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -34,10 +37,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.fuezl.gymdiary.core.model.Equipment
 import ru.fuezl.gymdiary.core.model.Exercise
@@ -50,17 +56,17 @@ import javax.inject.Inject
 
 data class ExercisesUiState(val query: String = "", val muscleGroup: MuscleGroup? = null, val equipment: Equipment? = null, val exercises: List<Exercise> = emptyList())
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class ExercisesViewModel @Inject constructor(private val repository: ExerciseRepository) : ViewModel() {
     private val query = MutableStateFlow("")
     private val muscleGroup = MutableStateFlow<MuscleGroup?>(null)
     private val equipment = MutableStateFlow<Equipment?>(null)
 
-    val uiState = combine(query, muscleGroup, equipment) { q, m, e -> Triple(q, m, e) }
+    val uiState = combine(query.debounce(150), muscleGroup, equipment) { q, m, e -> Triple(q, m, e) }
         .flatMapLatest { (q, m, e) ->
-            repository.searchExercises(q, m, e).combine(query) { list, currentQuery ->
-                ExercisesUiState(currentQuery, m, e, list)
+            repository.searchExercises(q, m, e).map { list ->
+                ExercisesUiState(q, m, e, list)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExercisesUiState())
@@ -94,6 +100,12 @@ fun ExercisesScreen(
     onMuscleGroupChange: (MuscleGroup?) -> Unit,
     onEquipmentChange: (Equipment?) -> Unit
 ) {
+    var queryField by remember { mutableStateOf(TextFieldValue(state.query, selection = TextRange(state.query.length))) }
+    LaunchedEffect(state.query) {
+        if (state.query != queryField.text) {
+            queryField = TextFieldValue(state.query, selection = TextRange(state.query.length))
+        }
+    }
     Scaffold(
         modifier = Modifier.padding(contentPadding),
         floatingActionButton = {
@@ -112,8 +124,11 @@ fun ExercisesScreen(
             item { GymDiaryTopBar("Упражнения") }
             item {
                 OutlinedTextField(
-                    value = state.query,
-                    onValueChange = onQueryChange,
+                    value = queryField,
+                    onValueChange = {
+                        queryField = it
+                        onQueryChange(it.text)
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Поиск") },
                     singleLine = true
@@ -128,7 +143,7 @@ fun ExercisesScreen(
             if (state.exercises.isEmpty()) {
                 item { EmptyState("Нет упражнений") }
             } else {
-                items(state.exercises, key = { it.id }) { exercise ->
+                items(state.exercises, key = { it.id }, contentType = { "exercise" }) { exercise ->
                     ExerciseCard(exercise, onClick = { onEdit(exercise.id) })
                 }
             }

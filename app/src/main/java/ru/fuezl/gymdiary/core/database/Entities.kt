@@ -77,7 +77,6 @@ data class WorkoutSetEntity(
     val setNumber: Int,
     val weightKg: Double,
     val reps: Int,
-    val rpe: Double? = null,
     val isCompleted: Boolean = false,
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis()

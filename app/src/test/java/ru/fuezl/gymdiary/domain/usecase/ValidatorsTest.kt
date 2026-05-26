@@ -9,21 +9,24 @@ class ValidatorsTest {
     fun exerciseNameValidation_returnsRussianErrors() {
         assertEquals("Название не может быть пустым", ExerciseValidator.validateName(""))
         assertEquals("Название не может быть пустым", ExerciseValidator.validateName("   "))
+        assertEquals("Название не может быть пустым", ExerciseValidator.validateName("\n\t"))
         assertEquals("Название должно быть не короче 2 символов", ExerciseValidator.validateName("A"))
         assertEquals("Название должно быть не короче 2 символов", ExerciseValidator.validateName(" A "))
         assertNull(ExerciseValidator.validateName("AB"))
         assertNull(ExerciseValidator.validateName("Жим"))
+        assertNull(ExerciseValidator.validateName(" Жим "))
     }
 
     @Test
     fun setValidation_rejectsInvalidValues() {
-        assertEquals("Вес не может быть отрицательным", SetValidator.validate(-1.0, 5, null))
-        assertEquals("Количество повторений не может быть отрицательным", SetValidator.validate(10.0, -1, null))
-        assertEquals("RPE должен быть от 1 до 10", SetValidator.validate(10.0, 5, 0.9))
-        assertEquals("RPE должен быть от 1 до 10", SetValidator.validate(10.0, 5, 11.0))
-        assertNull(SetValidator.validate(0.0, 0, null))
-        assertNull(SetValidator.validate(10.0, 5, 1.0))
-        assertNull(SetValidator.validate(10.0, 5, 8.5))
-        assertNull(SetValidator.validate(10.0, 5, 10.0))
+        assertEquals("Вес должен быть числом", SetValidator.validate(Double.NaN, 5))
+        assertEquals("Вес должен быть числом", SetValidator.validate(Double.POSITIVE_INFINITY, 5))
+        assertEquals("Вес должен быть числом", SetValidator.validate(Double.NEGATIVE_INFINITY, 5))
+        assertEquals("Вес не может быть отрицательным", SetValidator.validate(-1.0, 5))
+        assertEquals("Вес не может быть отрицательным", SetValidator.validate(-0.001, 5))
+        assertEquals("Количество повторений не может быть отрицательным", SetValidator.validate(10.0, -1))
+        assertNull(SetValidator.validate(0.0, 0))
+        assertNull(SetValidator.validate(0.001, 0))
+        assertNull(SetValidator.validate(10.0, 5))
     }
 }

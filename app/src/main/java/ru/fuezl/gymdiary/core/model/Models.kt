@@ -70,7 +70,6 @@ data class WorkoutSetModel(
     val setNumber: Int,
     val weightKg: Double,
     val reps: Int,
-    val rpe: Double?,
     val isCompleted: Boolean,
     val note: String,
     val createdAt: Long
