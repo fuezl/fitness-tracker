@@ -9,7 +9,8 @@ import ru.fuezl.gymdiary.domain.usecase.TrainingCalculators
 
 fun ExerciseEntity.asModel(): Exercise = Exercise(id, name, muscleGroup, equipment, note, isCustom, createdAt, updatedAt)
 
-fun WorkoutSetEntity.asModel(): WorkoutSetModel = WorkoutSetModel(id, workoutExerciseId, setNumber, weightKg, reps, isCompleted, note, createdAt)
+fun WorkoutSetEntity.asModel(): WorkoutSetModel =
+    WorkoutSetModel(id, workoutExerciseId, setNumber, weightKg, reps, isCompleted, note, createdAt, plannedWeightKg, plannedReps)
 
 fun WorkoutSessionWithDetails.asDetails(): WorkoutDetails {
     val sortedExercises = exercises.sortedBy { it.workoutExercise.orderIndex }
@@ -36,7 +37,8 @@ fun WorkoutSessionWithDetails.asDetails(): WorkoutDetails {
                 exerciseId = it.exercise.id,
                 exerciseName = it.exercise.name,
                 note = it.workoutExercise.note,
-                sets = it.sets.sortedBy { set -> set.setNumber }.map { set -> set.asModel() }
+                sets = it.sets.sortedBy { set -> set.setNumber }.map { set -> set.asModel() },
+                restSeconds = it.workoutExercise.restSeconds
             )
         }
     )

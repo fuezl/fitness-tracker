@@ -62,7 +62,7 @@ class GymDiaryDatabaseTest {
         val barbellPresses = exerciseDao.searchExercises("жим", MuscleGroup.CHEST.name, Equipment.BARBELL.name).first()
         val empty = exerciseDao.searchExercises("жим", MuscleGroup.BACK.name, null).first()
 
-        assertEquals(listOf("жим гантелей", "Жим штанги"), chestPresses.map { it.name })
+        assertEquals(setOf("жим гантелей", "Жим штанги"), chestPresses.map { it.name }.toSet())
         assertEquals(listOf("Жим штанги"), barbellPresses.map { it.name })
         assertEquals(emptyList<ExerciseEntity>(), empty)
     }

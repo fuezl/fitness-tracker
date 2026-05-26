@@ -44,6 +44,7 @@ import ru.fuezl.gymdiary.feature.settings.SettingsRoute
 import ru.fuezl.gymdiary.feature.workout.ActiveWorkoutRoute
 import ru.fuezl.gymdiary.feature.workout.AddExerciseToWorkoutRoute
 import ru.fuezl.gymdiary.feature.workout.StartWorkoutRoute
+import ru.fuezl.gymdiary.feature.workout.WorkoutExerciseEditorRoute
 
 private data class BottomItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -155,7 +156,17 @@ private fun androidx.navigation.NavGraphBuilder.addWorkoutGraph(navController: N
         ActiveWorkoutRoute(
             contentPadding = padding,
             onAddExercise = { navController.navigate("addExercise/$it") },
+            onOpenExercise = { navController.navigate("workoutExercise/$it") },
             onHistory = { navController.navigateHistoryAfterWorkout() }
+        )
+    }
+    composable(
+        Routes.WORKOUT_EXERCISE,
+        arguments = listOf(navArgument("workoutExerciseId") { type = NavType.LongType })
+    ) { entry ->
+        WorkoutExerciseEditorRoute(
+            workoutExerciseId = entry.arguments?.getLong("workoutExerciseId") ?: 0L,
+            onBack = { navController.popBackStack() }
         )
     }
     composable(

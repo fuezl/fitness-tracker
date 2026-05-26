@@ -192,6 +192,58 @@ class RepositoryIntegrationTest {
     }
 
     @Test
+    fun workoutRepository_storesPlannedSetValuesActualSetValuesAndExerciseRest() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val repository = DefaultWorkoutRepository(workoutDao, templateDao)
+        val workoutId = repository.startWorkout("Грудь")
+        val workoutExerciseId = repository.addExerciseToWorkout(workoutId, exerciseId)
+        val setId = repository.addSet(workoutExerciseId)
+
+        repository.updateWorkoutExerciseRest(workoutExerciseId, 150)
+        repository.updateSet(
+            WorkoutSetModel(
+                id = setId,
+                workoutExerciseId = workoutExerciseId,
+                setNumber = 1,
+                weightKg = 97.5,
+                reps = 4,
+                isCompleted = false,
+                note = "тяжело",
+                createdAt = 0,
+                plannedWeightKg = 100.0,
+                plannedReps = 5
+            )
+        )
+
+        val details = repository.observeWorkoutDetails(workoutId).first() ?: error("details not found")
+        val exercise = details.exercises.single()
+        val set = exercise.sets.single()
+
+        assertEquals(150, exercise.restSeconds)
+        assertEquals(100.0, set.plannedWeightKg ?: 0.0, 0.001)
+        assertEquals(5, set.plannedReps)
+        assertEquals(97.5, set.weightKg, 0.001)
+        assertEquals(4, set.reps)
+        assertEquals("тяжело", set.note)
+    }
+
+    @Test
+    fun workoutRepository_firstCompletedSetStartsPreparedWorkoutAtActualTrainingTime() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val repository = DefaultWorkoutRepository(workoutDao, templateDao)
+        val workoutId = repository.startWorkout("Заранее подготовленная")
+        workoutDao.getSession(workoutId)?.let { workoutDao.updateSession(it.copy(startedAt = 1L)) }
+        val workoutExerciseId = repository.addExerciseToWorkout(workoutId, exerciseId)
+        val setId = repository.addSet(workoutExerciseId)
+
+        repository.completeSet(setId, true)
+
+        val details = repository.observeWorkoutDetails(workoutId).first() ?: error("details not found")
+        assertTrue(details.summary.startedAt > 1L)
+        assertEquals(0L, details.summary.durationSeconds)
+    }
+
+    @Test
     fun workoutRepository_dashboardSnapshotCalculatesHomeScreenDataFromSingleHistoryFlow() = runTest {
         val recentExerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
         val oldExerciseId = exerciseDao.insert(ExerciseEntity(name = "Тяга", muscleGroup = MuscleGroup.BACK, equipment = Equipment.BARBELL))
@@ -244,7 +296,7 @@ class RepositoryIntegrationTest {
         assertEquals(1, repository.observeWorkoutHistory().first().size)
         assertEquals(0, active.summary.durationSeconds)
         assertEquals(0, normalized.summary.durationSeconds)
-        assertEquals(activeWorkoutId, workoutDao.observeActiveWorkout().first()?.id)
+        assertEquals(invalidFinishId, workoutDao.observeActiveWorkout().first()?.id)
     }
 
     @Test
@@ -419,6 +471,89 @@ class RepositoryIntegrationTest {
     }
 
     @Test
+    fun settingsRepository_importRestoresPreparedBackfilledWorkoutPlanFactRestAndSettings() = runTest {
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Присед", muscleGroup = MuscleGroup.LEGS, equipment = Equipment.BARBELL))
+        val workoutRepository = DefaultWorkoutRepository(workoutDao, templateDao)
+        val settingsRepository = DefaultSettingsRepository(database, exerciseDao, workoutDao, templateDao, bodyWeightDao, goalDao, settingsDataSource)
+        val startedAt = LocalDateTime.of(2024, 2, 1, 0, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val workoutId = workoutRepository.startBackfilledWorkout("Старая тренировка без времени", startedAt, null)
+        val workoutExerciseId = workoutRepository.addExerciseToWorkout(workoutId, exerciseId)
+        val setId = workoutRepository.addSet(workoutExerciseId)
+        workoutRepository.updateWorkoutExerciseRest(workoutExerciseId, 210)
+        workoutRepository.updateSet(
+            WorkoutSetModel(
+                id = setId,
+                workoutExerciseId = workoutExerciseId,
+                setNumber = 1,
+                weightKg = 95.0,
+                reps = 4,
+                isCompleted = false,
+                note = "план на зал",
+                createdAt = 0,
+                plannedWeightKg = 100.0,
+                plannedReps = 5
+            )
+        )
+        settingsRepository.updateTheme(ThemeMode.LIGHT)
+        settingsRepository.updateRestTimer(enabled = false, seconds = 45)
+        settingsRepository.updateHaptics(false)
+        val exported = settingsRepository.exportData()
+
+        database.clearAllTables()
+        settingsDataSource.restore(UserSettings())
+        settingsRepository.importData(exported)
+
+        val restored = workoutRepository.observeWorkoutDetails(workoutId).first() ?: error("restored workout not found")
+        val restoredSet = restored.exercises.single().sets.single()
+        assertEquals(startedAt, restored.summary.startedAt)
+        assertEquals(0L, restored.summary.durationSeconds)
+        assertEquals(workoutId, workoutDao.observeActiveWorkout().first()?.id)
+        assertEquals(210, restored.exercises.single().restSeconds)
+        assertEquals(100.0, restoredSet.plannedWeightKg ?: 0.0, 0.001)
+        assertEquals(5, restoredSet.plannedReps)
+        assertEquals(95.0, restoredSet.weightKg, 0.001)
+        assertEquals(4, restoredSet.reps)
+        assertEquals("план на зал", restoredSet.note)
+        assertEquals(UserSettings(ThemeMode.LIGHT, 45, restTimerEnabled = false, hapticsEnabled = false), settingsDataSource.settings.first())
+    }
+
+    @Test
+    fun settingsRepository_exportImportHandlesEmptyBackupAndUnknownFields() = runTest {
+        val settingsRepository = DefaultSettingsRepository(database, exerciseDao, workoutDao, templateDao, bodyWeightDao, goalDao, settingsDataSource)
+        settingsRepository.updateTheme(ThemeMode.DARK)
+        val emptyExport = settingsRepository.exportData()
+        val withUnknownFields = emptyExport
+            .replaceFirst("{", """{"futureTopLevel": {"ignored": true},""")
+            .replaceFirst("\"settings\": {", """"settings": {"futureSetting": "ignored",""")
+
+        exerciseDao.insert(ExerciseEntity(name = "Будет очищено", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        settingsRepository.importData(withUnknownFields)
+
+        assertEquals(emptyList<ExerciseEntity>(), exerciseDao.getAll())
+        assertEquals(emptyList<Any>(), workoutDao.getAllSessions())
+        assertEquals(emptyList<Any>(), templateDao.getAllTemplates())
+        assertEquals(emptyList<Any>(), bodyWeightDao.getAll())
+        assertEquals(emptyList<Any>(), goalDao.getAll())
+        assertEquals(ThemeMode.DARK, settingsDataSource.settings.first().themeMode)
+    }
+
+    @Test
+    fun settingsRepository_importPreservesDuplicateExerciseNamesWithDistinctIds() = runTest {
+        val settingsRepository = DefaultSettingsRepository(database, exerciseDao, workoutDao, templateDao, bodyWeightDao, goalDao, settingsDataSource)
+        val firstId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val secondId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.SHOULDERS, equipment = Equipment.DUMBBELL))
+        val exported = settingsRepository.exportData()
+
+        database.clearAllTables()
+        settingsRepository.importData(exported)
+
+        val restored = exerciseDao.getAll().sortedBy { it.id }
+        assertEquals(listOf(firstId, secondId), restored.map { it.id })
+        assertEquals(listOf("Жим", "Жим"), restored.map { it.name })
+        assertEquals(listOf(MuscleGroup.CHEST, MuscleGroup.SHOULDERS), restored.map { it.muscleGroup })
+    }
+
+    @Test
     fun settingsRepository_importAcceptsLegacyUnknownRpeField() = runTest {
         val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
         val workoutRepository = DefaultWorkoutRepository(workoutDao, templateDao)
@@ -448,11 +583,33 @@ class RepositoryIntegrationTest {
         workoutRepository.updateSet(WorkoutSetModel(setId, workoutExerciseId, 1, 100.0, 5, false, "", 0))
         val invalidLinkedJson = settingsRepository.exportData().replace("\"exerciseId\": $exerciseId", "\"exerciseId\": 999")
 
-        runCatching { settingsRepository.importData(invalidLinkedJson) }
+        val result = runCatching { settingsRepository.importData(invalidLinkedJson) }
 
+        assertTrue(result.isFailure)
         assertEquals(1, exerciseDao.getAll().size)
         assertEquals(1, workoutDao.getAllSessions().size)
         assertEquals(1, workoutDao.getAllSets().size)
+    }
+
+    @Test
+    fun settingsRepository_invalidImportDoesNotRestoreSettingsOrClearLinkedData() = runTest {
+        val settingsRepository = DefaultSettingsRepository(database, exerciseDao, workoutDao, templateDao, bodyWeightDao, goalDao, settingsDataSource)
+        val exerciseId = exerciseDao.insert(ExerciseEntity(name = "Жим", muscleGroup = MuscleGroup.CHEST, equipment = Equipment.BARBELL))
+        val workoutRepository = DefaultWorkoutRepository(workoutDao, templateDao)
+        val workoutId = workoutRepository.startWorkout("Грудь")
+        workoutRepository.addExerciseToWorkout(workoutId, exerciseId)
+        settingsRepository.updateTheme(ThemeMode.DARK)
+        val invalidJson = settingsRepository.exportData()
+            .replace("\"themeMode\": \"DARK\"", "\"themeMode\": \"LIGHT\"")
+            .replace("\"exerciseId\": $exerciseId", "\"exerciseId\": 999")
+
+        val result = runCatching { settingsRepository.importData(invalidJson) }
+
+        assertTrue(result.isFailure)
+        assertEquals(ThemeMode.DARK, settingsDataSource.settings.first().themeMode)
+        assertEquals(listOf(exerciseId), exerciseDao.getAll().map { it.id })
+        assertEquals(listOf(workoutId), workoutDao.getAllSessions().map { it.id })
+        assertEquals(1, workoutDao.getAllWorkoutExercises().size)
     }
 
     @Test

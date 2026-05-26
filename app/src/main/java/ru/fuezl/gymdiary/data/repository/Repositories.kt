@@ -127,6 +127,7 @@ interface WorkoutRepository {
     suspend fun deleteSet(setId: Long)
     suspend fun updateWorkoutNote(workoutId: Long, note: String, energyLevel: Int?, sleepQuality: Int?, painNote: String)
     suspend fun updateWorkoutExerciseNote(workoutExerciseId: Long, note: String)
+    suspend fun updateWorkoutExerciseRest(workoutExerciseId: Long, restSeconds: Int?)
     suspend fun finishWorkout(workoutId: Long)
     suspend fun deleteWorkout(workoutId: Long)
     suspend fun repeatWorkout(workoutId: Long): Long
@@ -230,6 +231,8 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
                 id = set.id,
                 workoutExerciseId = set.workoutExerciseId,
                 setNumber = set.setNumber,
+                plannedWeightKg = set.plannedWeightKg,
+                plannedReps = set.plannedReps,
                 weightKg = set.weightKg,
                 reps = set.reps,
                 isCompleted = set.isCompleted,
@@ -240,10 +243,22 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
     }
 
     override suspend fun completeSet(setId: Long, completed: Boolean) {
-        dao.getSet(setId)?.let { dao.updateSet(it.copy(isCompleted = completed)) }
+        val set = dao.getSet(setId) ?: return
+        if (completed && !set.isCompleted) resetStartAtFirstCompletedSet(set.workoutExerciseId)
+        dao.updateSet(set.copy(isCompleted = completed))
     }
 
     override suspend fun deleteSet(setId: Long) = dao.deleteSet(setId)
+
+    private suspend fun resetStartAtFirstCompletedSet(workoutExerciseId: Long) {
+        val workoutExercise = dao.getWorkoutExercise(workoutExerciseId) ?: return
+        val session = dao.getSession(workoutExercise.workoutSessionId) ?: return
+        if (session.finishedAt != null) return
+        val details = dao.getWorkoutDetails(session.id)?.asDetails() ?: return
+        if (details.exercises.any { exercise -> exercise.sets.any { it.isCompleted } }) return
+        val now = System.currentTimeMillis()
+        dao.updateSession(session.copy(startedAt = now, durationSeconds = 0, updatedAt = now))
+    }
 
     override suspend fun updateWorkoutNote(workoutId: Long, note: String, energyLevel: Int?, sleepQuality: Int?, painNote: String) {
         dao.getSession(workoutId)?.let {
@@ -263,6 +278,12 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
         dao.getWorkoutExercise(workoutExerciseId)?.let { dao.updateWorkoutExercise(it.copy(note = note.trim())) }
     }
 
+    override suspend fun updateWorkoutExerciseRest(workoutExerciseId: Long, restSeconds: Int?) {
+        dao.getWorkoutExercise(workoutExerciseId)?.let {
+            dao.updateWorkoutExercise(it.copy(restSeconds = restSeconds?.coerceAtLeast(0)))
+        }
+    }
+
     override suspend fun finishWorkout(workoutId: Long) {
         val session = dao.getSession(workoutId) ?: return
         val now = System.currentTimeMillis()
@@ -276,9 +297,21 @@ class DefaultWorkoutRepository @Inject constructor(private val dao: WorkoutDao, 
         val newId = startWorkout(details.summary.title)
         details.exercises.forEach { exercise ->
             val workoutExerciseId = addExerciseToWorkout(newId, exercise.exerciseId)
+            updateWorkoutExerciseRest(workoutExerciseId, exercise.restSeconds)
             exercise.sets.forEach { old ->
                 val setId = addSet(workoutExerciseId)
-                dao.getSet(setId)?.let { dao.updateSet(it.copy(weightKg = old.weightKg, reps = old.reps, note = old.note, isCompleted = false)) }
+                dao.getSet(setId)?.let {
+                    dao.updateSet(
+                        it.copy(
+                            plannedWeightKg = old.plannedWeightKg ?: old.weightKg.takeIf { weight -> weight > 0.0 },
+                            plannedReps = old.plannedReps ?: old.reps.takeIf { reps -> reps > 0 },
+                            weightKg = 0.0,
+                            reps = 0,
+                            note = old.note,
+                            isCompleted = false
+                        )
+                    )
+                }
             }
         }
         return newId

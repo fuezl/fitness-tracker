@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-      "identityHash": "3b88ecc073f86321bbb436a1125832c8",
+    "identityHash": "95cc087478b82f409225f7afa4b091c2",
     "entities": [
       {
         "tableName": "exercises",
@@ -66,7 +66,7 @@
       },
       {
         "tableName": "workout_sessions",
-          "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `finishedAt` INTEGER, `durationSeconds` INTEGER NOT NULL, `note` TEXT NOT NULL, `energyLevel` INTEGER, `sleepQuality` INTEGER, `painNote` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `finishedAt` INTEGER, `durationSeconds` INTEGER NOT NULL, `note` TEXT NOT NULL, `energyLevel` INTEGER, `sleepQuality` INTEGER, `painNote` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -103,21 +103,21 @@
             "affinity": "TEXT",
             "notNull": true
           },
-            {
-                "fieldPath": "energyLevel",
-                "columnName": "energyLevel",
-                "affinity": "INTEGER"
-            },
-            {
-                "fieldPath": "sleepQuality",
-                "columnName": "sleepQuality",
-                "affinity": "INTEGER"
-            },
-            {
-                "fieldPath": "painNote",
-                "columnName": "painNote",
-                "affinity": "TEXT",
-                "notNull": true
+          {
+            "fieldPath": "energyLevel",
+            "columnName": "energyLevel",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sleepQuality",
+            "columnName": "sleepQuality",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "painNote",
+            "columnName": "painNote",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "createdAt",
@@ -141,7 +141,7 @@
       },
       {
         "tableName": "workout_exercises",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutSessionId` INTEGER NOT NULL, `exerciseId` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `note` TEXT NOT NULL, FOREIGN KEY(`workoutSessionId`) REFERENCES `workout_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutSessionId` INTEGER NOT NULL, `exerciseId` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `note` TEXT NOT NULL, `restSeconds` INTEGER, FOREIGN KEY(`workoutSessionId`) REFERENCES `workout_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -172,6 +172,11 @@
             "columnName": "note",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "restSeconds",
+            "columnName": "restSeconds",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -227,7 +232,7 @@
       },
       {
         "tableName": "workout_sets",
-          "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutExerciseId` INTEGER NOT NULL, `setNumber` INTEGER NOT NULL, `weightKg` REAL NOT NULL, `reps` INTEGER NOT NULL, `isCompleted` INTEGER NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`workoutExerciseId`) REFERENCES `workout_exercises`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutExerciseId` INTEGER NOT NULL, `setNumber` INTEGER NOT NULL, `plannedWeightKg` REAL, `plannedReps` INTEGER, `weightKg` REAL NOT NULL, `reps` INTEGER NOT NULL, `isCompleted` INTEGER NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`workoutExerciseId`) REFERENCES `workout_exercises`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -246,6 +251,16 @@
             "columnName": "setNumber",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "plannedWeightKg",
+            "columnName": "plannedWeightKg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "plannedReps",
+            "columnName": "plannedReps",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "weightKg",
@@ -467,88 +482,88 @@
           ]
         }
       },
-        {
-            "tableName": "exercise_goals",
-            "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `exerciseId` INTEGER NOT NULL, `targetWeightKg` REAL NOT NULL, `targetReps` INTEGER NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-            "fields": [
-                {
-                    "fieldPath": "id",
-                    "columnName": "id",
-                    "affinity": "INTEGER",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "exerciseId",
-                    "columnName": "exerciseId",
-                    "affinity": "INTEGER",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "targetWeightKg",
-                    "columnName": "targetWeightKg",
-                    "affinity": "REAL",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "targetReps",
-                    "columnName": "targetReps",
-                    "affinity": "INTEGER",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "note",
-                    "columnName": "note",
-                    "affinity": "TEXT",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "columnName": "createdAt",
-                    "affinity": "INTEGER",
-                    "notNull": true
-                },
-                {
-                    "fieldPath": "updatedAt",
-                    "columnName": "updatedAt",
-                    "affinity": "INTEGER",
-                    "notNull": true
-                }
+      {
+        "tableName": "exercise_goals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `exerciseId` INTEGER NOT NULL, `targetWeightKg` REAL NOT NULL, `targetReps` INTEGER NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseId",
+            "columnName": "exerciseId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetWeightKg",
+            "columnName": "targetWeightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetReps",
+            "columnName": "targetReps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_exercise_goals_exerciseId",
+            "unique": true,
+            "columnNames": [
+              "exerciseId"
             ],
-            "primaryKey": {
-                "autoGenerate": true,
-                "columnNames": [
-                    "id"
-                ]
-            },
-            "indices": [
-                {
-                    "name": "index_exercise_goals_exerciseId",
-                    "unique": true,
-                    "columnNames": [
-                        "exerciseId"
-                    ],
-                    "orders": [],
-                    "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_exercise_goals_exerciseId` ON `${TABLE_NAME}` (`exerciseId`)"
-                }
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_exercise_goals_exerciseId` ON `${TABLE_NAME}` (`exerciseId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "exercises",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "exerciseId"
             ],
-            "foreignKeys": [
-                {
-                    "table": "exercises",
-                    "onDelete": "CASCADE",
-                    "onUpdate": "NO ACTION",
-                    "columns": [
-                        "exerciseId"
-                    ],
-                    "referencedColumns": [
-                        "id"
-                    ]
-                }
+            "referencedColumns": [
+              "id"
             ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-        "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3b88ecc073f86321bbb436a1125832c8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '95cc087478b82f409225f7afa4b091c2')"
     ]
   }
 }

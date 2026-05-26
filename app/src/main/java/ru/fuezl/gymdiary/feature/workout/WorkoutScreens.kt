@@ -246,6 +246,38 @@ data class ActiveWorkoutUiState(
     val errorMessage: String? = null
 )
 
+private data class SetDraft(
+    val plannedWeightKg: Double?,
+    val plannedReps: Int?,
+    val weightKg: Double,
+    val reps: Int,
+    val note: String
+)
+
+private fun validatePlannedSet(plannedWeight: String, plannedWeightValue: Double?, plannedReps: String, plannedRepsValue: Int?): String? = when {
+    plannedWeight.isNotBlank() && plannedWeightValue == null -> "Плановые значения должны быть числами"
+    plannedReps.isNotBlank() && plannedRepsValue == null -> "Плановые значения должны быть числами"
+    plannedWeightValue != null && !plannedWeightValue.isFinite() -> "Плановые значения должны быть числами"
+    plannedWeightValue != null && plannedWeightValue < 0.0 -> "Плановые значения не могут быть отрицательными"
+    plannedRepsValue != null && plannedRepsValue < 0 -> "Плановые значения не могут быть отрицательными"
+    else -> null
+}
+
+private fun WorkoutSetModel.matches(draft: SetDraft): Boolean =
+    plannedWeightKg == draft.plannedWeightKg &&
+        plannedReps == draft.plannedReps &&
+        weightKg == draft.weightKg &&
+        reps == draft.reps &&
+        note == draft.note
+
+private fun WorkoutSetModel.withDraft(draft: SetDraft): WorkoutSetModel = copy(
+    plannedWeightKg = draft.plannedWeightKg?.takeIf { it > 0.0 },
+    plannedReps = draft.plannedReps?.takeIf { it > 0 },
+    weightKg = draft.weightKg,
+    reps = draft.reps,
+    note = draft.note
+)
+
 @HiltViewModel
 class ActiveWorkoutViewModel @Inject constructor(private val workoutRepository: WorkoutRepository, private val templateRepository: WorkoutTemplateRepository, settingsRepository: SettingsRepository) :
     ViewModel() {
@@ -270,6 +302,7 @@ class ActiveWorkoutViewModel @Inject constructor(private val workoutRepository: 
     private val setUpdateJobs = mutableMapOf<Long, Job>()
     private var workoutNoteJob: Job? = null
     private val exerciseNoteJobs = mutableMapOf<Long, Job>()
+    private val exerciseRestJobs = mutableMapOf<Long, Job>()
 
     init {
         viewModelScope.launch {
@@ -310,28 +343,57 @@ class ActiveWorkoutViewModel @Inject constructor(private val workoutRepository: 
 
     fun addSet(workoutExerciseId: Long) = viewModelScope.launch { workoutRepository.addSet(workoutExerciseId) }
 
-    fun updateSet(set: WorkoutSetModel, weight: String, reps: String, note: String) {
-        val weightValue = weight.replace(',', '.').toDoubleOrNull() ?: 0.0
-        val repsValue = reps.toIntOrNull() ?: 0
-        val error = SetValidator.validate(weightValue, repsValue)
-        if (error != null) {
-            local.update { it.copy(errorMessage = error) }
-            return
-        }
-        if (set.weightKg == weightValue && set.reps == repsValue && set.note == note) return
+    fun updateSet(
+        set: WorkoutSetModel,
+        plannedWeight: String,
+        plannedReps: String,
+        actualWeight: String,
+        actualReps: String,
+        note: String
+    ) {
+        val draft = parseSetDraft(plannedWeight, plannedReps, actualWeight, actualReps, note) ?: return
+        if (set.matches(draft)) return
         setUpdateJobs[set.id]?.cancel()
         setUpdateJobs[set.id] = viewModelScope.launch {
             delay(INPUT_SAVE_DEBOUNCE_MS)
-            workoutRepository.updateSet(set.copy(weightKg = weightValue, reps = repsValue, note = note))
+            workoutRepository.updateSet(set.withDraft(draft))
             setUpdateJobs.remove(set.id)
         }
+    }
+
+    private fun parseSetDraft(
+        plannedWeight: String,
+        plannedReps: String,
+        actualWeight: String,
+        actualReps: String,
+        note: String
+    ): SetDraft? {
+        val plannedWeightValue = plannedWeight.replace(',', '.').toDoubleOrNull()
+        val plannedRepsValue = plannedReps.toIntOrNull()
+        val planError = validatePlannedSet(plannedWeight, plannedWeightValue, plannedReps, plannedRepsValue)
+        if (planError != null) {
+            local.update { it.copy(errorMessage = planError) }
+            return null
+        }
+        val actualWeightValue = actualWeight.replace(',', '.').toDoubleOrNull() ?: 0.0
+        val actualRepsValue = actualReps.toIntOrNull() ?: 0
+        val actualError = SetValidator.validate(actualWeightValue, actualRepsValue)
+        if (actualError != null) {
+            local.update { it.copy(errorMessage = actualError) }
+            return null
+        }
+        return SetDraft(plannedWeightValue, plannedRepsValue, actualWeightValue, actualRepsValue, note)
     }
 
     fun completeSet(set: WorkoutSetModel, completed: Boolean) {
         viewModelScope.launch {
             workoutRepository.completeSet(set.id, completed)
             if (completed && settings.value.restTimerEnabled) {
-                local.update { it.copy(restTimerState = RestTimerState(settings.value.defaultRestTimerSeconds)) }
+                val exerciseRest = uiState.value.workout
+                    ?.exercises
+                    ?.firstOrNull { it.workoutExerciseId == set.workoutExerciseId }
+                    ?.restSeconds
+                local.update { it.copy(restTimerState = RestTimerState(exerciseRest ?: settings.value.defaultRestTimerSeconds)) }
             }
         }
     }
@@ -364,6 +426,19 @@ class ActiveWorkoutViewModel @Inject constructor(private val workoutRepository: 
             delay(INPUT_SAVE_DEBOUNCE_MS)
             workoutRepository.updateWorkoutExerciseNote(workoutExerciseId, note)
             exerciseNoteJobs.remove(workoutExerciseId)
+        }
+    }
+    fun updateExerciseRest(workoutExerciseId: Long, restSeconds: String) {
+        val seconds = restSeconds.toIntOrNull()
+        if (restSeconds.isNotBlank() && (seconds == null || seconds < 0)) {
+            local.update { it.copy(errorMessage = "Время отдыха должно быть неотрицательным числом секунд") }
+            return
+        }
+        exerciseRestJobs[workoutExerciseId]?.cancel()
+        exerciseRestJobs[workoutExerciseId] = viewModelScope.launch {
+            delay(INPUT_SAVE_DEBOUNCE_MS)
+            workoutRepository.updateWorkoutExerciseRest(workoutExerciseId, seconds?.takeIf { it > 0 })
+            exerciseRestJobs.remove(workoutExerciseId)
         }
     }
     fun addRestTime() = local.update { it.copy(restTimerState = it.restTimerState.copy(remainingSeconds = it.restTimerState.remainingSeconds + 30)) }
@@ -411,21 +486,14 @@ private data class ActiveWorkoutActions(
     val onHideFinish: () -> Unit,
     val onFinish: () -> Unit,
     val onSaveTemplate: () -> Unit,
-    val setActions: ActiveSetActions,
     val noteActions: ActiveNoteActions,
     val restActions: ActiveRestActions
 )
 
-private data class ActiveSetActions(
-    val onAddSet: (Long) -> Unit,
-    val onUpdateSet: (WorkoutSetModel, String, String, String) -> Unit,
-    val onCompleteSet: (WorkoutSetModel, Boolean) -> Unit,
-    val onDeleteSet: (Long) -> Unit
-)
-
 private data class ActiveNoteActions(
     val onUpdateWorkoutNote: (String, String) -> Unit,
-    val onUpdateExerciseNote: (Long, String) -> Unit
+    val onUpdateExerciseNote: (Long, String) -> Unit,
+    val onUpdateExerciseRest: (Long, String) -> Unit
 )
 
 private data class ActiveRestActions(
@@ -438,6 +506,7 @@ private data class ActiveRestActions(
 fun ActiveWorkoutRoute(
     contentPadding: PaddingValues,
     onAddExercise: (Long) -> Unit,
+    onOpenExercise: (Long) -> Unit,
     onHistory: () -> Unit,
     viewModel: ActiveWorkoutViewModel = hiltViewModel()
 ) {
@@ -447,12 +516,8 @@ fun ActiveWorkoutRoute(
         state,
         contentPadding,
         onAddExercise,
-        viewModel::addSet,
-        viewModel::updateSet,
-        viewModel::completeSet,
-        viewModel::deleteSet,
         viewModel::updateWorkoutNote,
-        viewModel::updateExerciseNote,
+        onOpenExercise,
         viewModel::showFinishDialog,
         viewModel::hideFinishDialog,
         viewModel::finish,
@@ -469,12 +534,8 @@ fun ActiveWorkoutScreen(
     state: ActiveWorkoutUiState,
     contentPadding: PaddingValues,
     onAddExercise: (Long) -> Unit,
-    onAddSet: (Long) -> Unit,
-    onUpdateSet: (WorkoutSetModel, String, String, String) -> Unit,
-    onCompleteSet: (WorkoutSetModel, Boolean) -> Unit,
-    onDeleteSet: (Long) -> Unit,
     onUpdateWorkoutNote: (String, String) -> Unit,
-    onUpdateExerciseNote: (Long, String) -> Unit,
+    onOpenExercise: (Long) -> Unit,
     onShowFinish: () -> Unit,
     onHideFinish: () -> Unit,
     onFinish: () -> Unit,
@@ -492,8 +553,7 @@ fun ActiveWorkoutScreen(
         onHideFinish = onHideFinish,
         onFinish = onFinish,
         onSaveTemplate = onSaveTemplate,
-        setActions = ActiveSetActions(onAddSet, onUpdateSet, onCompleteSet, onDeleteSet),
-        noteActions = ActiveNoteActions(onUpdateWorkoutNote, onUpdateExerciseNote),
+        noteActions = ActiveNoteActions(onUpdateWorkoutNote, { _, _ -> }, { _, _ -> }),
         restActions = ActiveRestActions(onAddRest, onSkipRest, onPauseRest)
     )
     LaunchedEffect(state.restFinishedSignal) {
@@ -504,7 +564,8 @@ fun ActiveWorkoutScreen(
     LazyColumn(
         Modifier
             .fillMaxSize()
-            .padding(contentPadding),
+            .padding(contentPadding)
+            .testTag("active_workout_list"),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -512,7 +573,7 @@ fun ActiveWorkoutScreen(
         if (workout == null) {
             item { EmptyState("Активной тренировки нет") }
         } else {
-            activeWorkoutContent(state, workout, actions, haptics)
+            activeWorkoutContent(state, workout, actions, haptics, onOpenExercise)
         }
     }
     if (state.isFinishDialogVisible) {
@@ -525,7 +586,8 @@ private fun LazyListScope.activeWorkoutContent(
     state: ActiveWorkoutUiState,
     workout: WorkoutDetails,
     actions: ActiveWorkoutActions,
-    haptics: HapticFeedback
+    haptics: HapticFeedback,
+    onOpenExercise: (Long) -> Unit
 ) {
     item { ActiveWorkoutHeader(state, workout, actions, haptics) }
     item { AddExerciseButton(workout.summary.id, state.hapticsEnabled, actions.onAddExercise, haptics) }
@@ -533,7 +595,7 @@ private fun LazyListScope.activeWorkoutContent(
         item { EmptyState("Добавьте первое упражнение") }
     } else {
         items(workout.exercises, key = { it.workoutExerciseId }, contentType = { "workout_exercise" }) { exercise ->
-            ActiveWorkoutExerciseCard(exercise, state, actions, haptics)
+            ActiveWorkoutExerciseSummaryCard(exercise, state.hapticsEnabled, haptics, onOpenExercise)
         }
     }
     item { ActiveWorkoutFooter(state.hapticsEnabled, actions, haptics) }
@@ -605,46 +667,113 @@ private fun AddExerciseButton(
     onAddExercise: (Long) -> Unit,
     haptics: HapticFeedback
 ) {
-    Button(onClick = {
-        haptics.performGymHaptic(hapticsEnabled)
-        onAddExercise(workoutId)
-    }, modifier = Modifier.fillMaxWidth()) {
+    Button(
+        onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onAddExercise(workoutId)
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("add_exercise")
+    ) {
         Icon(Icons.Default.Add, contentDescription = null)
         Text("Добавить упражнение", Modifier.padding(start = 8.dp))
     }
 }
 
 @Composable
-private fun ActiveWorkoutExerciseCard(
+private fun ActiveWorkoutExerciseSummaryCard(
     exercise: WorkoutExerciseDetails,
-    state: ActiveWorkoutUiState,
-    actions: ActiveWorkoutActions,
-    haptics: HapticFeedback
+    hapticsEnabled: Boolean,
+    haptics: HapticFeedback,
+    onOpenExercise: (Long) -> Unit
 ) {
     Card(
+        onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onOpenExercise(exercise.workoutExerciseId)
+        },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        val history = state.exerciseHistory[exercise.exerciseId].orEmpty()
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(exercise.exerciseName, style = MaterialTheme.typography.titleMedium)
-            ExerciseTrainingHints(history)
-            ExerciseNoteField(exercise, actions.noteActions)
-            exercise.sets.forEach { set ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricChip("Подх.", exercise.sets.size.toString())
+                MetricChip("Готово", exercise.sets.count { it.isCompleted }.toString())
+                exercise.restSeconds?.let { MetricChip("Отдых", "${it}с") }
+            }
+            Text("Открыть подходы и план", color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+fun WorkoutExerciseEditorRoute(workoutExerciseId: Long, onBack: () -> Unit, viewModel: ActiveWorkoutViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    WorkoutExerciseEditorScreen(
+        state = state,
+        workoutExerciseId = workoutExerciseId,
+        onBack = onBack,
+        onAddSet = viewModel::addSet,
+        onUpdateSet = viewModel::updateSet,
+        onCompleteSet = viewModel::completeSet,
+        onDeleteSet = viewModel::deleteSet,
+        onUpdateExerciseNote = viewModel::updateExerciseNote,
+        onUpdateExerciseRest = viewModel::updateExerciseRest
+    )
+}
+
+@Composable
+fun WorkoutExerciseEditorScreen(
+    state: ActiveWorkoutUiState,
+    workoutExerciseId: Long,
+    onBack: () -> Unit,
+    onAddSet: (Long) -> Unit,
+    onUpdateSet: (WorkoutSetModel, String, String, String, String, String) -> Unit,
+    onCompleteSet: (WorkoutSetModel, Boolean) -> Unit,
+    onDeleteSet: (Long) -> Unit,
+    onUpdateExerciseNote: (Long, String) -> Unit,
+    onUpdateExerciseRest: (Long, String) -> Unit
+) {
+    val exercise = state.workout?.exercises?.firstOrNull { it.workoutExerciseId == workoutExerciseId }
+    val history = exercise?.let { state.exerciseHistory[it.exerciseId].orEmpty() }.orEmpty()
+    val haptics = LocalHapticFeedback.current
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { GymDiaryTopBar(exercise?.exerciseName ?: "Упражнение", onBack) }
+        if (exercise == null) {
+            item { EmptyState("Упражнение не найдено") }
+        } else {
+            item {
+                Card {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ExerciseTrainingHints(history)
+                        ExerciseNoteField(exercise, ActiveNoteActions({ _, _ -> }, onUpdateExerciseNote, onUpdateExerciseRest))
+                        ExerciseRestField(exercise, ActiveNoteActions({ _, _ -> }, onUpdateExerciseNote, onUpdateExerciseRest))
+                    }
+                }
+            }
+            items(exercise.sets, key = { it.id }, contentType = { "set" }) { set ->
                 SetRow(
-                    set,
-                    history.firstOrNull()?.sets?.getOrNull(set.setNumber - 1),
-                    state.hapticsEnabled,
-                    actions.setActions.onUpdateSet,
-                    actions.setActions.onCompleteSet,
-                    actions.setActions.onDeleteSet
+                    set = set,
+                    previousSet = history.firstOrNull()?.sets?.getOrNull(set.setNumber - 1),
+                    hapticsEnabled = state.hapticsEnabled,
+                    onUpdateSet = onUpdateSet,
+                    onCompleteSet = onCompleteSet,
+                    onDeleteSet = onDeleteSet
                 )
             }
-            OutlinedButton(onClick = {
-                haptics.performGymHaptic(state.hapticsEnabled)
-                actions.setActions.onAddSet(exercise.workoutExerciseId)
-            }, modifier = Modifier.testTag("add_set")) {
-                Text("Добавить подход")
+            item {
+                OutlinedButton(onClick = {
+                    haptics.performGymHaptic(state.hapticsEnabled)
+                    onAddSet(exercise.workoutExerciseId)
+                }, modifier = Modifier.fillMaxWidth().testTag("add_set")) {
+                    Text("Добавить подход")
+                }
             }
         }
     }
@@ -660,7 +789,28 @@ private fun ExerciseNoteField(exercise: WorkoutExerciseDetails, actions: ActiveN
             actions.onUpdateExerciseNote(exercise.workoutExerciseId, exerciseNote)
         },
         label = { Text("Заметка к упражнению") },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("exercise_note")
+    )
+}
+
+@Composable
+private fun ExerciseRestField(exercise: WorkoutExerciseDetails, actions: ActiveNoteActions) {
+    var restSeconds by remember(exercise.workoutExerciseId, exercise.restSeconds) {
+        mutableStateOf(exercise.restSeconds?.toString().orEmpty())
+    }
+    OutlinedTextField(
+        restSeconds,
+        {
+            restSeconds = it
+            actions.onUpdateExerciseRest(exercise.workoutExerciseId, restSeconds)
+        },
+        label = { Text("Отдых между подходами, сек") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("exercise_rest"),
+        singleLine = true
     )
 }
 
@@ -671,14 +821,24 @@ private fun ActiveWorkoutFooter(
     haptics: HapticFeedback
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = {
-            haptics.performGymHaptic(hapticsEnabled)
-            actions.onSaveTemplate()
-        }, modifier = Modifier.weight(1f)) { Text("В шаблон") }
-        Button(onClick = {
-            haptics.performGymHaptic(hapticsEnabled, HapticFeedbackType.LongPress)
-            actions.onShowFinish()
-        }, modifier = Modifier.weight(1f)) { Text("Завершить") }
+        OutlinedButton(
+            onClick = {
+                haptics.performGymHaptic(hapticsEnabled)
+                actions.onSaveTemplate()
+            },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("save_template")
+        ) { Text("В шаблон") }
+        Button(
+            onClick = {
+                haptics.performGymHaptic(hapticsEnabled, HapticFeedbackType.LongPress)
+                actions.onShowFinish()
+            },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("show_finish")
+        ) { Text("Завершить") }
     }
 }
 
@@ -715,14 +875,19 @@ fun SetRow(
     set: WorkoutSetModel,
     previousSet: WorkoutSetModel?,
     hapticsEnabled: Boolean,
-    onUpdateSet: (WorkoutSetModel, String, String, String) -> Unit,
+    onUpdateSet: (WorkoutSetModel, String, String, String, String, String) -> Unit,
     onCompleteSet: (WorkoutSetModel, Boolean) -> Unit,
     onDeleteSet: (Long) -> Unit
 ) {
-    var weight by remember(set.id, set.weightKg) { mutableStateOf(if (set.weightKg == 0.0) "" else set.weightKg.toString()) }
-    var reps by remember(set.id, set.reps) { mutableStateOf(if (set.reps == 0) "" else set.reps.toString()) }
+    var plannedWeight by remember(set.id, set.plannedWeightKg) { mutableStateOf(set.plannedWeightKg?.toString().orEmpty()) }
+    var plannedReps by remember(set.id, set.plannedReps) { mutableStateOf(set.plannedReps?.toString().orEmpty()) }
+    var actualWeight by remember(set.id, set.weightKg) { mutableStateOf(if (set.weightKg == 0.0) "" else set.weightKg.toString()) }
+    var actualReps by remember(set.id, set.reps) { mutableStateOf(if (set.reps == 0) "" else set.reps.toString()) }
     var note by remember(set.id, set.note) { mutableStateOf(set.note) }
     val haptics = LocalHapticFeedback.current
+    val submit: (String, String, String, String, String) -> Unit = { plannedWeightValue, plannedRepsValue, actualWeightValue, actualRepsValue, noteValue ->
+        onUpdateSet(set, plannedWeightValue, plannedRepsValue, actualWeightValue, actualRepsValue, noteValue)
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -743,46 +908,117 @@ fun SetRow(
                 }) { Icon(Icons.Default.Delete, contentDescription = "Удалить подход") }
             }
             previousSet?.let { Text("Прошлый раз: ${it.weightKg.formatKg()} × ${it.reps}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(weight, {
-                    weight = it
-                    onUpdateSet(set, weight, reps, note)
-                }, label = { Text("Вес") }, modifier = Modifier.weight(1f), singleLine = true)
-                OutlinedTextField(reps, {
-                    reps = it
-                    onUpdateSet(set, weight, reps, note)
-                }, label = { Text("Повт.") }, modifier = Modifier.weight(1f), singleLine = true)
+            SetValueFields("План", plannedWeight, plannedReps, "План вес", "План повт.", "planned_weight", "planned_reps") { weight, reps ->
+                plannedWeight = weight
+                plannedReps = reps
+                submit(weight, reps, actualWeight, actualReps, note)
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = {
-                    haptics.performGymHaptic(hapticsEnabled)
-                    weight = ((weight.replace(',', '.').toDoubleOrNull() ?: 0.0) + 2.5).toString()
-                    onUpdateSet(set, weight, reps, note)
-                }) { Text("+2.5") }
-                OutlinedButton(onClick = {
-                    haptics.performGymHaptic(hapticsEnabled)
-                    weight =
-                        (((weight.replace(',', '.').toDoubleOrNull() ?: 0.0) - 2.5).coerceAtLeast(0.0)).toString()
-                    onUpdateSet(set, weight, reps, note)
-                }) { Text("-2.5") }
-                OutlinedButton(onClick = {
-                    haptics.performGymHaptic(hapticsEnabled)
-                    reps = ((reps.toIntOrNull() ?: 0) + 1).toString()
-                    onUpdateSet(set, weight, reps, note)
-                }) { Text("+1 повт.") }
-                previousSet?.let {
-                    OutlinedButton(onClick = {
-                        haptics.performGymHaptic(hapticsEnabled)
-                        weight = it.weightKg.toString()
-                        reps = it.reps.toString()
-                        onUpdateSet(set, weight, reps, note)
-                    }) { Text("Копия") }
+            SetValueFields("Факт", actualWeight, actualReps, "Факт вес", "Факт повт.", "actual_weight", "actual_reps") { weight, reps ->
+                actualWeight = weight
+                actualReps = reps
+                submit(plannedWeight, plannedReps, weight, reps, note)
+            }
+            SetQuickActions(
+                previousSet = previousSet,
+                hapticsEnabled = hapticsEnabled,
+                plannedWeight = plannedWeight,
+                plannedReps = plannedReps,
+                actualWeight = actualWeight,
+                actualReps = actualReps,
+                onActualChange = { weight, reps ->
+                    actualWeight = weight
+                    actualReps = reps
+                    submit(plannedWeight, plannedReps, weight, reps, note)
                 }
-            }
-            OutlinedTextField(note, {
+            )
+            SetNoteField(note) {
                 note = it
-                onUpdateSet(set, weight, reps, note)
-            }, label = { Text("Комментарий") }, modifier = Modifier.fillMaxWidth())
+                submit(plannedWeight, plannedReps, actualWeight, actualReps, it)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetValueFields(
+    title: String,
+    weight: String,
+    reps: String,
+    weightLabel: String,
+    repsLabel: String,
+    weightTag: String,
+    repsTag: String,
+    onChange: (String, String) -> Unit
+) {
+    Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            weight,
+            { onChange(it, reps) },
+            label = { Text(weightLabel) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag(weightTag),
+            singleLine = true
+        )
+        OutlinedTextField(
+            reps,
+            { onChange(weight, it) },
+            label = { Text(repsLabel) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag(repsTag),
+            singleLine = true
+        )
+    }
+}
+
+@Composable
+private fun SetNoteField(note: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        note,
+        onChange,
+        label = { Text("Комментарий") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("set_note")
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SetQuickActions(
+    previousSet: WorkoutSetModel?,
+    hapticsEnabled: Boolean,
+    plannedWeight: String,
+    plannedReps: String,
+    actualWeight: String,
+    actualReps: String,
+    onActualChange: (String, String) -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onActualChange(((actualWeight.replace(',', '.').toDoubleOrNull() ?: 0.0) + 2.5).toString(), actualReps)
+        }) { Text("+2.5") }
+        OutlinedButton(onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onActualChange((((actualWeight.replace(',', '.').toDoubleOrNull() ?: 0.0) - 2.5).coerceAtLeast(0.0)).toString(), actualReps)
+        }) { Text("-2.5") }
+        OutlinedButton(onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onActualChange(actualWeight, ((actualReps.toIntOrNull() ?: 0) + 1).toString())
+        }) { Text("+1 повт.") }
+        OutlinedButton(onClick = {
+            haptics.performGymHaptic(hapticsEnabled)
+            onActualChange(plannedWeight, plannedReps)
+        }) { Text("План в факт") }
+        previousSet?.let {
+            OutlinedButton(onClick = {
+                haptics.performGymHaptic(hapticsEnabled)
+                onActualChange(it.weightKg.toString(), it.reps.toString())
+            }) { Text("Копия") }
         }
     }
 }
@@ -821,7 +1057,9 @@ private fun BackfillWorkoutCard(error: String?, onStart: (String, String, String
                         finishTime?.format(backfillTimeFormatter).orEmpty()
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("add_exercise_search")
             ) {
                 Text("Внести старую тренировку")
             }

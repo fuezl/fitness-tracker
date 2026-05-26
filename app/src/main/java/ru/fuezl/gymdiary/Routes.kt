@@ -6,6 +6,7 @@ object Routes {
     const val EXERCISE_EDIT = "exerciseEdit/{exerciseId}"
     const val START_WORKOUT = "startWorkout"
     const val ACTIVE_WORKOUT = "activeWorkout"
+    const val WORKOUT_EXERCISE = "workoutExercise/{workoutExerciseId}"
     const val ADD_EXERCISE = "addExercise/{workoutId}"
     const val HISTORY = "history"
     const val DETAILS = "details/{workoutId}"

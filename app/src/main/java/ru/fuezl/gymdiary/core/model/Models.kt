@@ -61,7 +61,14 @@ data class WorkoutSummary(
 data class WorkoutDetails(val summary: WorkoutSummary, val note: String, val painNote: String, val exercises: List<WorkoutExerciseDetails>)
 
 @Serializable
-data class WorkoutExerciseDetails(val workoutExerciseId: Long, val exerciseId: Long, val exerciseName: String, val note: String, val sets: List<WorkoutSetModel>)
+data class WorkoutExerciseDetails(
+    val workoutExerciseId: Long,
+    val exerciseId: Long,
+    val exerciseName: String,
+    val note: String,
+    val sets: List<WorkoutSetModel>,
+    val restSeconds: Int? = null
+)
 
 @Serializable
 data class WorkoutSetModel(
@@ -72,7 +79,9 @@ data class WorkoutSetModel(
     val reps: Int,
     val isCompleted: Boolean,
     val note: String,
-    val createdAt: Long
+    val createdAt: Long,
+    val plannedWeightKg: Double? = null,
+    val plannedReps: Int? = null
 )
 
 @Serializable

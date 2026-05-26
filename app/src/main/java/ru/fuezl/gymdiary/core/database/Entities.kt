@@ -56,7 +56,14 @@ data class WorkoutSessionEntity(
     ],
     indices = [Index("workoutSessionId"), Index("exerciseId")]
 )
-data class WorkoutExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val workoutSessionId: Long, val exerciseId: Long, val orderIndex: Int, val note: String = "")
+data class WorkoutExerciseEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workoutSessionId: Long,
+    val exerciseId: Long,
+    val orderIndex: Int,
+    val note: String = "",
+    val restSeconds: Int? = null
+)
 
 @Serializable
 @Entity(
@@ -75,6 +82,8 @@ data class WorkoutSetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutExerciseId: Long,
     val setNumber: Int,
+    val plannedWeightKg: Double? = null,
+    val plannedReps: Int? = null,
     val weightKg: Double,
     val reps: Int,
     val isCompleted: Boolean = false,
